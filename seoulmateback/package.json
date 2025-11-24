@@ -1,0 +1,26 @@
+{
+  "name": "seoulmate-backend",
+  "version": "1.0.0",
+  "description": "SEOULMATE - 네이버 지도 API 연동 여행 경로 최적화 백엔드",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "naver-maps",
+    "routing",
+    "travel"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.29.1",
+    "@google/generative-ai": "^0.24.1",
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2"
+  }
+}
