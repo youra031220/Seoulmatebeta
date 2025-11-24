@@ -1433,3 +1433,4 @@ export default function App() {
 
 
 // 깃허브 test 확인용 주석
+// merge rule 확인용 주석
