@@ -1,0 +1,270 @@
+/* 공통 기본값 */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #f3f4f6;
+}
+
+/* App 최상위 */
+.app-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== 상단 아래 전체 레이아웃 =====
+   데스크탑: 좌측 패널 + 우측 메인 (2컬럼)
+   모바일: 위에서 아래로 세로로 쌓임 */
+.app-layout {
+  display: grid;
+  grid-template-columns: 850px 1fr;
+  height: calc(100vh - 100px); /* Header 높이 감안 */
+}
+
+/* 왼쪽 패널 전체 (출발/도착, 옵션, 필수 방문지, 챗봇, 버튼) */
+.left-panel {
+  padding: 24px;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+/* 왼쪽 패널 내부 2컬럼 (데스크탑에서만) */
+.left-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 32px;
+}
+
+/* 필요하면 개별 컬럼에 스타일 추가 가능 */
+.left-col,
+.right-col {
+  min-width: 0;
+}
+
+/* 오른쪽 메인 (지도 + 일정표 + 세부정보) */
+.right-main {
+  background: #f9fafb;
+  padding: 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 각 섹션 카드가 화면 폭에 꽉 차게 */
+.map-card,
+.schedule-card,
+.details-card {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* 지도 카드 */
+.map-card {
+  height: 550px;
+  flex-shrink: 0;
+  border-radius: 32px;
+  overflow: hidden;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  background: #ffffff;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+  background: #e5e7eb;
+}
+
+/* 일정 / 세부정보 카드 */
+.schedule-card,
+.details-card {
+  border-radius: 24px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16);
+  background: #ffffff;
+  padding: 16px;
+}
+
+.details-card {
+  margin-bottom: 8px;
+}
+
+/* ===== 1024px 이하 (좁은 노트북) ===== */
+@media (max-width: 1024px) {
+  .app-layout {
+    grid-template-columns: 420px 1fr;
+  }
+
+  .map-card {
+    height: 480px;
+    border-radius: 28px;
+  }
+}
+
+/* ===== 768px 이하: 모바일 레이아웃 ===== */
+@media (max-width: 768px) {
+  /* 상단 전체를 세로로 쌓기 */
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: auto; /* 세로 고정 빼기 */
+  }
+
+  /* 왼쪽 패널이 화면 상단에 먼저 나오고 */
+  .left-panel {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 16px;
+    max-height: none;
+  }
+
+  /* 왼쪽 패널 안의 2컬럼 → 세로로 */
+  .left-columns {
+    display: flex;
+    flex-direction: column;
+    row-gap: 24px;
+  }
+
+  .right-main {
+    padding: 12px;
+  }
+
+  .map-card {
+    height: 320px;
+    border-radius: 24px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.22);
+  }
+
+  .schedule-card,
+  .details-card {
+    border-radius: 20px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* 아주 작은 화면 (아이폰 SE 정도) */
+@media (max-width: 480px) {
+  .left-panel {
+    padding: 12px;
+  }
+
+  .right-main {
+    padding: 10px;
+  }
+
+  .map-card {
+    height: 260px;
+  }
+}
+/* ===== 기본 레이아웃 (데스크탑) ===== */
+.app-layout {
+  display: grid;
+  grid-template-columns: 850px 1fr;
+  height: calc(100vh - 100px); /* Header 제외 영역 */
+}
+
+.left-panel {
+  padding: 24px;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.right-main {
+  background: #f9fafb;
+  padding: 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 왼쪽 패널 안의 2컬럼 (데스크탑 기준) */
+.left-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 32px;
+}
+
+/* 지도/일정 카드가 화면 폭에 맞게 */
+.map-card,
+.schedule-card,
+.details-card {
+  width: 100%;
+}
+
+/* 지도 높이 */
+.map-card {
+  height: 550px;
+}
+
+/* ===== 1024px 이하 (좁은 노트북) ===== */
+@media (max-width: 1024px) {
+  .app-layout {
+    grid-template-columns: 420px 1fr;
+  }
+
+  .map-card {
+    height: 480px;
+  }
+}
+
+/* ===== 768px 이하: 모바일 레이아웃 ===== */
+@media (max-width: 768px) {
+  /* 좌우 2열 → 위아래 1열 */
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: auto;          /* 세로 고정 풀기 */
+  }
+
+  /* 왼쪽 패널이 화면 상단 전체를 차지 */
+  .left-panel {
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 16px;
+    max-height: none;
+  }
+
+  /* 왼쪽 패널 안의 2컬럼도 위/아래로 쌓기 */
+  .left-columns {
+    display: flex;
+    flex-direction: column;
+    row-gap: 24px;
+  }
+
+  /* 오른쪽(지도/일정)도 여백 조금 줄이기 */
+  .right-main {
+    padding: 12px;
+  }
+
+  .map-card {
+    height: 55vh;   /* 모바일 지도 높이 */
+  }
+
+  .schedule-card,
+  .details-card {
+    width: 100%;
+  }
+   
+}
+
+
+
