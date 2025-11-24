@@ -1,0 +1,223 @@
+.required-stops-container {
+  width: 100%;
+}
+
+.required-stops-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.required-stops-box {
+  position: relative;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* 검색 input */
+.required-stops-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: #111827;
+  background: transparent;
+}
+
+/* 칩 리스트 */
+.required-stops-chip-list {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 칩 하나 */
+.required-stops-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.required-stops-chip-remove {
+  margin-left: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* 드롭다운 전체 */
+.required-stops-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  z-index: 30;
+}
+
+/* 드롭다운 아이템 */
+.required-stops-item {
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.required-stops-item:hover {
+  background-color: #f9fafb;
+}
+
+/* 장소 제목 */
+.required-stops-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* 주소 */
+.required-stops-item-addr {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+.required-stops-container {
+  width: 100%;
+}
+
+.required-stops-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+/* 바깥 박스 */
+.required-stops-box {
+  position: relative;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  padding: 10px 16px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* 인풋 줄 */
+.required-stops-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.required-stops-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+}
+
+.required-stops-clear {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* 칩 영역 */
+.required-stops-chip-list {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.required-stops-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  font-size: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.required-stops-chip-label {
+  margin-right: 6px;
+}
+
+.required-stops-chip-remove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+/* 드롭다운 */
+.required-stops-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-top: 8px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  z-index: 30;
+}
+
+.required-stops-loading {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.required-stops-item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.required-stops-item:hover {
+  background-color: #f9fafb;
+}
+
+.required-stops-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.required-stops-item-addr {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
