@@ -1,3 +1,4 @@
+```javascript
 /* ===================== 샘플 POI/기본 위치 ===================== */
 /**
  * 실제 서비스에서는 네이버 검색 결과(basePOIs)를 사용하고,
@@ -512,3 +513,4 @@ export function generateSchedule(
 
   return rows;
 }
+```
