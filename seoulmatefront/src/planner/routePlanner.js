@@ -1,3 +1,4 @@
+```javascript
 /* ===================== 샘플 POI/기본 위치 ===================== */
 /**
  * 실제 서비스에서는 네이버 검색 결과(basePOIs)를 사용하고,
@@ -399,7 +400,7 @@ export function optimizeRoute(
     for (const idx of remaining) {
       const [__, cand] = routeArray[idx];
       const leg = travelMinutes(curNode.lat, curNode.lon, cand.lat, cand.lon);
-      if (leg < bestLeg) {
+      if (leg < bestLeg && now + leg + (cand?.poi?.stay_time ?? 30) <= endMin && leg <= maxLegMin) {
         bestLeg = leg;
         bestIdx = idx;
       }
@@ -421,20 +422,30 @@ export function optimizeRoute(
   }
 
   // 6) 마지막으로 도착지까지 이동
-  const [__, lastNode] = routeArray[currentIdx];
-  const [___, endNode2] = routeArray[n - 1];
-  const legToEnd = travelMinutes(
-    lastNode.lat,
-    lastNode.lon,
-    endNode2.lat,
-    endNode2.lon
-  );
+  if (currentIdx !== n - 1) {
+      const [__, lastNode] = routeArray[currentIdx];
+      const [___, endNode2] = routeArray[n - 1];
+      const legToEnd = travelMinutes(
+        lastNode.lat,
+        lastNode.lon,
+        endNode2.lat,
+        endNode2.lon
+      );
 
-  waits[n - 1] = legToEnd;
-  stays[n - 1] = 0;
-  route.push(n - 1);
+      if (now + legToEnd <= endMin && legToEnd <= maxLegMin) {
+        waits[n - 1] = legToEnd;
+        stays[n - 1] = 0;
+        route.push(n - 1);
+      } else {
+        //console.log("End point skipped due to time constraints.");
+      }
+  }
 
-  return { routeArray, route, waits, stays };
+  // Sort the route based on waits (travel time)
+  const sortedRoute = [...route];
+  sortedRoute.sort((a, b) => (waits[a] || 0) - (waits[b] || 0));
+  
+  return { routeArray, route: sortedRoute, waits, stays };
 }
 
 
@@ -469,11 +480,11 @@ export function generateSchedule(
         ? "도착"
         : poi?.category || "";
 
-    const wait = waits[i] || 0;
+    const wait = waits[idx] || 0;
     now += wait;
     const arrival = toHM(now);
 
-    const stay = stays[i] || 0;
+    const stay = stays[idx] || 0;
     now += stay;
     const depart = toHM(now);
 
@@ -502,4 +513,4 @@ export function generateSchedule(
 
   return rows;
 }
-
+```
