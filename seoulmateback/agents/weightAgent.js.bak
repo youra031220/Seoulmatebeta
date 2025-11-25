@@ -42,7 +42,7 @@ export function generateWeights(prefs) {
   };
 
   // 1. 예산 수준에 따른 가중치 설정
-  const budgetLevel = prefs?.budgetLevel || "mid";
+  const budgetLevel = prefs.budgetLevel || "mid";
 
   if (budgetLevel === "low") {
     weights.budget.priceWeight = -0.3; // 가격이 낮을수록 점수 증가
@@ -59,7 +59,7 @@ export function generateWeights(prefs) {
   }
 
   // 2. 페이스에 따른 가중치 설정
-  const pace = prefs?.pace || "normal";
+  const pace = prefs.pace || "normal";
 
   if (pace === "relaxed") {
     weights.pace.distanceWeight = -0.3; // 거리가 멀면 페널티
@@ -76,9 +76,9 @@ export function generateWeights(prefs) {
   }
 
   // 3. 테마/태그 매칭 가중치 설정
-  const hasThemes = (prefs?.themes || []).length > 0;
-  const hasTags = (prefs?.poiTags || []).length > 0;
-  const hasAvoid = (prefs?.mustAvoid || []).length > 0;
+  const hasThemes = (prefs.themes || []).length > 0;
+  const hasTags = (prefs.poiTags || []).length > 0;
+  const hasAvoid = (prefs.mustAvoid || []).length > 0;
 
   weights.theme.themeMatchBonus = hasThemes ? 0.6 : 0.3;
   weights.theme.tagMatchBonus = hasTags ? 0.5 : 0.2;
@@ -86,8 +86,8 @@ export function generateWeights(prefs) {
 
   // 4. 카테고리별 가중치 설정
   // 음식 쿼리가 많으면 음식점/카페 가중치 증가
-  const foodQueryCount = (prefs?.foodSearchQueries || []).length;
-  const poiQueryCount = (prefs?.poiSearchQueries || []).length + (prefs?.searchKeywords || []).length;
+  const foodQueryCount = (prefs.foodSearchQueries || []).length;
+  const poiQueryCount = (prefs.poiSearchQueries || []).length + (prefs.searchKeywords || []).length;
 
   const totalQueries = foodQueryCount + poiQueryCount;
 
@@ -106,7 +106,7 @@ export function generateWeights(prefs) {
   }
 
   // 5. 식이 선호도 가중치
-  const hasDietPrefs = (prefs?.dietPreferences || []).length > 0;
+  const hasDietPrefs = (prefs.dietPreferences || []).length > 0;
   weights.diet.dietMatchBonus = hasDietPrefs ? 0.7 : 0;
 
   // 메타데이터 추가
@@ -114,10 +114,10 @@ export function generateWeights(prefs) {
     generatedAt: new Date().toISOString(),
     budgetLevel,
     pace,
-    themesCount: (prefs?.themes || []).length,
-    tagsCount: (prefs?.poiTags || []).length,
-    avoidCount: (prefs?.mustAvoid || []).length,
-    dietPrefsCount: (prefs?.dietPreferences || []).length,
+    themesCount: (prefs.themes || []).length,
+    tagsCount: (prefs.poiTags || []).length,
+    avoidCount: (prefs.mustAvoid || []).length,
+    dietPrefsCount: (prefs.dietPreferences || []).length,
   };
 
   return weights;
@@ -130,10 +130,6 @@ export function generateWeights(prefs) {
  */
 export function validateWeights(weights) {
   const errors = [];
-
-  if (!weights || typeof weights !== 'object') {
-    return { valid: false, errors: ['Weights object is missing or invalid'] };
-  }
 
   // 1. 필수 최상위 필드 확인
   const requiredFields = ['budget', 'pace', 'theme', 'category', 'diet'];
@@ -182,7 +178,7 @@ export function validateWeights(weights) {
         errors.push(`weights.category.${field} must be a number`);
       }
       // 가중치는 0 이상이어야 함
-      if (typeof weights.category[field] === 'number' && weights.category[field] < 0) {
+      if (weights.category[field] < 0) {
         errors.push(`weights.category.${field} must be >= 0`);
       }
     }
@@ -202,11 +198,13 @@ export function validateWeights(weights) {
     ...Object.values(weights.theme || {}),
     ...Object.values(weights.category || {}),
     ...Object.values(weights.diet || {}),
-  ].filter(w => typeof w === 'number');
+  ];
 
   for (const w of allWeights) {
-    if (w < -2 || w > 2) {
-      errors.push(`Weight value ${w} is outside reasonable range [-2, 2]`);
+    if (typeof w === 'number') {
+      if (w < -2 || w > 2) {
+        errors.push(`Weight value ${w} is outside reasonable range [-2, 2]`);
+      }
     }
   }
 
