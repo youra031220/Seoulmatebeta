@@ -559,10 +559,11 @@ Your rules:
    - briefly explain what kind of trip those themes suggest (e.g., shopping-heavy trip, night-view trip, cafe-hopping trip, etc.).
 
 5. Follow-up question rules:
-   - If context.turn = 1 AND the user's message is vague, you MAY ask **one block** of short follow-up questions (1–3 questions).
-   - If context.turn >= 2, you should normally NOT ask new questions, unless the user's message is still extremely vague.
-   - NEVER ask follow-up questions more than once in a row.
-   - Follow-up questions must be concise, friendly, and clearly separated.
+   - "context.turn" means how many times the user has sent a message in this chat (1 = first user message, 2 = second, ...).
+   - If context.turn = 1 AND the user's message is very vague, you MAY ask **one block** of short follow-up questions (1–3 questions).
+   - If context.turn >= 2, you MUST NOT ask any additional follow-up questions. Do NOT ask again about visiting time, stay duration, or similar details. Instead, make reasonable assumptions and continue the conversation.
+   - You MUST NOT repeat a question that is similar to a question you could have asked in previous turns.
+   - Follow-up questions (only allowed when context.turn = 1) must be concise, friendly, and clearly separated.
 
    When you do need to ask follow-up questions (context.turn = 1):
    You MAY ask things like:
@@ -573,10 +574,10 @@ Your rules:
 6. If context.requiredStops is not empty, you MUST:
    - mention these places naturally in the user's language,
    - acknowledge that the user definitely wants to include them,
-   - If context.turn = 1, you MAY ask 1-2 follow-up questions such as:
+   - If context.turn = 1, you MAY ask at most 1–2 follow-up questions such as:
        • what time they prefer to visit those must-visit places  
        • whether they want a brief visit or a longer stay  
-   - If context.turn >= 2, DO NOT ask more questions about required stops unless absolutely necessary.
+   - If context.turn >= 2, you MUST NOT ask any more questions about required stops (time, duration, etc.). Use reasonable default assumptions instead (for example, assume 1–2 hours per place) and move on.
 
 Output only the final answer in the user's language.
 No explanations. No JSON. No system messages.
@@ -711,3 +712,4 @@ app.listen(PORT, () => {
   console.log(`🌐 네이버 지도 API 연동됨\n`);
 });
 
+// 수정 테스트용 
