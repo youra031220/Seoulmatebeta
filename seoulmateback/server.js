@@ -106,7 +106,7 @@ if (!NAVER_MAP_KEY_ID || !NAVER_MAP_KEY) {
 }
 
 // ===================== Gemini: 여행 취향 분석 =====================
-async function analyzeTravelPreference(message, context = {}) {
+async function analyzeTravelPreference(message, context = {}, requiredStopNames = []) {
   if (!genAIClient) {
     throw new Error("Gemini 클라이언트가 초기화되지 않았습니다.");
   }
@@ -187,6 +187,16 @@ async function analyzeTravelPreference(message, context = {}) {
   - foodSearchQueries
   안에 반드시 녹여서 구체적으로 반영해야 합니다.
 - searchKeywords / poiSearchQueries / foodSearchQueries에는 도시 이름을 넣지 마세요.
+
+### 🚨 필수 방문지 처리 규칙
+
+1. 필수 방문지(requiredStops)는 검색 키워드에 포함하지 마세요.
+   - 사용자가 "경복궁 꼭 가고 싶어"라고 말해도,
+   - searchKeywords, poiSearchQueries, foodSearchQueries에 "경복궁" 같은 필수 방문지 이름을 넣지 마세요.
+   - 필수 방문지는 이미 확정된 장소이므로, 검색 키워드는 **그 외의 새로운 장소**를 찾는 데 사용해야 합니다.
+
+2. 현재 필수 방문지 이름 목록(검색에서 제외해야 할 이름들)은 다음과 같습니다:
+${JSON.stringify(requiredStopNames || [])}
 
 ------------------------
 
@@ -487,7 +497,7 @@ app.post("/api/travel-pref", async (req, res) => {
 
     let prefs;
     try {
-      prefs = await analyzeTravelPreference(message, context);
+      prefs = await analyzeTravelPreference(message, context, []);
     } catch (error) {
       console.error("❌ /api/travel-pref Gemini 실패:", error?.message || error);
       return res
@@ -521,9 +531,15 @@ app.post("/api/search-with-pref", async (req, res) => {
 
     console.log("🔍 /api/search-with-pref 요청");
 
+    // context에 포함된 필수 방문지 이름들을 추출해서 Gemini 프롬프트로 전달
+    const requiredStopNames =
+      (context?.requiredStops || [])
+        .map((r) => r && r.name)
+        .filter(Boolean);
+
     let prefs;
     try {
-      prefs = await analyzeTravelPreference(message, context);
+      prefs = await analyzeTravelPreference(message, context, requiredStopNames);
     } catch (error) {
       console.error("❌ Gemini 취향 분석 실패:", error?.message || error);
       return res
@@ -627,7 +643,20 @@ app.post("/api/search-with-pref", async (req, res) => {
     const startPoint = bodyStartPoint || context?.startPoint || null; // { lat, lng } 형식이라고 가정
     const scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
 
-    return res.json({ prefs: safePrefs, weights, city, pois: scoredPOIs });
+    // 편향 리포트(Phase C)를 위한 biasDetector 적용
+    let biasReport = null;
+    try {
+      const { detectSearchBias } = await import("./utils/biasDetector.js");
+      biasReport = detectSearchBias(
+        scoredPOIs,
+        context?.requiredStops || [],
+        safePrefs.themes || []
+      );
+    } catch (e) {
+      console.warn("⚠️ biasReport 생성 중 오류 (무시하고 진행):", e?.message || e);
+    }
+
+    return res.json({ prefs: safePrefs, weights, city, pois: scoredPOIs, biasReport });
   } catch (error) {
     console.error("❌ /api/search-with-pref 처리 실패:", error?.message || error);
     return res
@@ -668,7 +697,8 @@ app.post("/api/route/refine", async (req, res) => {
     // 1) 다시 한 번 취향 분석 (message + context 기반)
     let prefs;
     try {
-      prefs = await analyzeTravelPreference(message, context);
+      // refine에서는 필수 방문지를 별도로 다루지 않으므로 names는 빈 배열로 전달
+      prefs = await analyzeTravelPreference(message, context, []);
     } catch (error) {
       console.error("❌ /api/route/refine Gemini 실패:", error?.message || error);
       return res
