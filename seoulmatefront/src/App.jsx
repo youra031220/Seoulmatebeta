@@ -379,13 +379,38 @@ export default function App() {
   const fetchPoisFromServer = async () => {
     if (!startPoint?.name) return [];
 
+    // 1️⃣ wishLog를 복사해서 작업용 배열 생성
+    const trimmedLog = [...wishLog];
+
+    // 2️⃣ 마지막이 assistant라면 잘라낸다
+    while (
+      trimmedLog.length > 0 &&
+      trimmedLog[trimmedLog.length - 1].role === "assistant"
+    ) {
+      trimmedLog.pop();
+    }
+
+    // 3️⃣ user / assistant 대화 전체를 문자열로 변환 (마지막 assistant는 제거된 상태)
+    const fullConversation = trimmedLog
+      .map((msg) => {
+        const speaker = msg.role === "user" ? "User" : "Assistant";
+        return `${speaker}: ${msg.text}`;
+      })
+      .join("\n\n");
+    
+    // 4️⃣ 대화가 완전 비어 있으면 placeholder 사용
+    const travelMessage =
+      fullConversation && fullConversation.trim().length > 0
+        ? fullConversation
+        : t("wish.placeholder");
+
     try {
       const res = await fetch("http://localhost:5000/api/search-with-pref", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           baseArea: "서울",
-          message: wishText.trim() || t("wish.placeholder"),
+          message: travelMessage,
           context: {
             breakfast,
             lunch,
@@ -649,98 +674,109 @@ export default function App() {
   }
 };
 
-  /** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
-  const handleSendWish = async () => {
-    const text = wishText.trim();
-    if (!text) return;
+/** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
+const handleSendWish = async () => {
+  const text = wishText.trim();
+  if (!text) return;
 
-    // 1) 유저 메시지를 먼저 로그에 추가
-    setWishLog((prev) => [...prev, { id: Date.now(), role: "user", text }]);
-    setWishText("");
+  // 1️⃣ 이번이 몇 번째 유저 발화인지 계산 (1부터 시작)
+  const userTurn =
+    wishLog.filter((msg) => msg.role === "user").length + 1;
 
-    try {
-      const res = await fetch("http://localhost:5000/api/travel-wish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          context: {
-            breakfast,
-            lunch,
-            dinner,
-            cafe,
-            dietPrefs,
-            waitTolerance,
-            transportMode,
-            maxLeg,
-            numPlaces,
-            themes,
-            requiredStops,
-            
+  // 2️⃣ 유저 메시지를 먼저 로그에 추가
+  setWishLog((prev) => [
+    ...prev,
+    { id: Date.now(), role: "user", text },
+  ]);
 
-          },
-        }),
-      });
+  // 3️⃣ 입력창은 비움 (대신 wishLog에 기록이 남아 있음)
+  setWishText("");
 
-      // 2) 응답 상태/본문을 먼저 받아둠
-      const contentType = res.headers.get("content-type");
-      let data = null;
-
-      if (contentType && contentType.includes("application/json")) {
-        data = await res.json();
-      } else {
-        const rawText = await res.text();
-        data = { raw: rawText };
-      }
-
-      if (!res.ok) {
-        console.error("❌ /api/travel-wish 상태코드:", res.status, data);
-
-        // 3) 에러를 던지지 말고, 챗봇 말풍선으로 보여주기
-        setWishLog((prev) => [
-          ...prev,
-          {
-            id: Date.now() + 1,
-            role: "assistant",
-            text:
-              `서버 응답에 문제가 있어요 (status ${res.status}).\n` +
-              (data?.error
-                ? `에러 메시지: ${data.error}`
-                : data?.raw
-                ? `응답 내용: ${data.raw}`
-                : "자세한 정보는 콘솔을 확인해주세요."),
-          },
-        ]);
-        return;
-      }
-
-      // 4) 정상 케이스: Gemini 답변을 말풍선으로 추가
-      setWishLog((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 2,
-          role: "assistant",
-          text:
-            data?.reply ??
-            "여행 취향을 잘 받았어요! 일정에 반영해 볼게요 :)",
+  try {
+    const res = await fetch("http://localhost:5000/api/travel-wish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: text,
+        context: {
+          breakfast,
+          lunch,
+          dinner,
+          cafe,
+          dietPrefs,
+          waitTolerance,
+          transportMode,
+          maxLeg,
+          numPlaces,
+          startHour,
+          endHour,
+          themes,
+          requiredStops,
+          // 🔴 여기! turn 정보를 함께 보냄
+          turn: userTurn,
         },
-      ]);
-    } catch (err) {
-      console.error("❌ handleSendWish 에러:", err);
+      }),
+    });
 
-      // 5) 네트워크 에러 등도 말풍선으로 표시
-      setWishLog((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 3,
-          role: "assistant",
-          text:
-            "선호 분석 중 알 수 없는 오류가 발생했어요 🥲\n" +
-            "브라우저 콘솔과 서버 로그를 함께 확인해 주세요.",
-        },
-      ]);
+    // 4️⃣ 응답 content-type에 따라 파싱
+    const contentType = res.headers.get("content-type");
+    let data = null;
+
+    if (contentType && contentType.includes("application/json")) {
+      data = await res.json();
+    } else {
+      const rawText = await res.text();
+      data = { raw: rawText };
     }
-  };
+
+    // 5️⃣ 에러 응답 → assistant 말풍선으로 보여주기
+    if (!res.ok) {
+      console.error("❌ /api/travel-wish 상태코드:", res.status, data);
+
+      setWishLog((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          text:
+            `서버 응답에 문제가 있어요 (status ${res.status}).\n` +
+            (data?.error
+              ? `에러 메시지: ${data.error}`
+              : data?.raw
+              ? `응답 내용: ${data.raw}`
+              : "자세한 정보는 콘솔을 확인해주세요."),
+        },
+      ]);
+      return;
+    }
+
+    // 6️⃣ 정상 응답 → Gemini 답변을 assistant 말풍선으로 추가
+    setWishLog((prev) => [
+      ...prev,
+      {
+        id: Date.now() + 2,
+        role: "assistant",
+        text:
+          data?.reply ??
+          "여행 취향을 잘 받았어요! 일정에 반영해 볼게요 :)",
+      },
+    ]);
+  } catch (err) {
+    console.error("❌ handleSendWish 에러:", err);
+
+    // 7️⃣ 네트워크/예외 에러도 말풍선으로 알려주기
+    setWishLog((prev) => [
+      ...prev,
+      {
+        id: Date.now() + 3,
+        role: "assistant",
+        text:
+          "선호 분석 중 알 수 없는 오류가 발생했어요 🥲\n" +
+          "브라우저 콘솔과 서버 로그를 함께 확인해 주세요.",
+      },
+    ]);
+  }
+};
 
   /** 공통 버튼 스타일 util */
   const gradientBtnStyle = (active) => ({
@@ -1543,5 +1579,3 @@ export default function App() {
 }
 
 
-// 깃허브 test 확인용 주석
-// merge rule 확인용 주석33
