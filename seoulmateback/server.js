@@ -73,8 +73,12 @@ const NAVER_MAP_KEY = process.env.NAVER_MAP_KEY;
 const RAW_GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_KEY = RAW_GEMINI_API_KEY ? RAW_GEMINI_API_KEY.trim() : "";
 
-console.log("GEMINI RAW KEY:", `[${RAW_GEMINI_API_KEY}]`);
-console.log("GEMINI TRIMMED KEY:", `[${GEMINI_API_KEY}]`);
+// 🔐 실제 키 값은 찍지 않고, 길이만 로그로 확인
+if (RAW_GEMINI_API_KEY) {
+  console.log("GEMINI KEY LOADED (length):", RAW_GEMINI_API_KEY.length);
+} else {
+  console.error("❌ GEMINI_API_KEY 환경변수가 비어 있습니다.");
+}
 
 if (!GEMINI_API_KEY) {
   console.error('❌ 환경변수 GEMINI_API_KEY(Gemini)을 설정하세요.');
@@ -83,12 +87,15 @@ if (!GEMINI_API_KEY) {
 // ✅ Gemini 클라이언트 초기화
 let genAIClient;
 try {
+  if (GEMINI_API_KEY) {
     genAIClient = new GoogleGenerativeAI(GEMINI_API_KEY);
+  } else {
+    genAIClient = null;
+  }
 } catch (error) {
-    console.error('❌ Gemini 클라이언트 초기화 실패:', error);
-    genAIClient = null; // or handle the error as needed, e.g., exit the process
+  console.error('❌ Gemini 클라이언트 초기화 실패:', error);
+  genAIClient = null;
 }
-
 
 // ===================== 환경변수 체크 =====================
 if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
@@ -101,7 +108,7 @@ if (!NAVER_MAP_KEY_ID || !NAVER_MAP_KEY) {
 // ===================== Gemini: 여행 취향 분석 =====================
 async function analyzeTravelPreference(message, context = {}) {
   if (!genAIClient) {
-      throw new Error("Gemini 클라이언트가 초기화되지 않았습니다.");
+    throw new Error("Gemini 클라이언트가 초기화되지 않았습니다.");
   }
 
   const modelName = "gemini-2.0-flash";
@@ -147,7 +154,7 @@ async function analyzeTravelPreference(message, context = {}) {
     - "비싼 데는 별로 안가고 싶어" → "가성비 맛집", "저렴한 맛집", "합리적인 가격 식당"
     - "쉬엄쉬엄" → "한가로운 산책", "여유로운 산책 코스"
     - "야경이 멋진 곳" → "야경 명소", "야경 전망대", "야경 포토스팟"
-    - "유명한 인스타감성 카페" → "인스타 감성 카페", "인스타그램 핫플 카페", "감성 카페"
+    - "유명한 인스타감성 카페" → "인스타 감성 카페", "인스타그램 핫플 핫 카페", "감성 카페"
 
 ### 도시명 포함 여부
 
@@ -500,7 +507,13 @@ app.post("/api/travel-pref", async (req, res) => {
 // 5️⃣ 취향 + 지역 기반 장소 검색
 app.post("/api/search-with-pref", async (req, res) => {
   try {
-    const { baseArea = "", message = "", context = {} } = req.body || {};
+    // startPoint를 body에서 직접 받을 수도 있고, context 안에서 받을 수도 있게 처리
+    const {
+      baseArea = "",
+      message = "",
+      context = {},
+      startPoint: bodyStartPoint,
+    } = req.body || {};
 
     if (!baseArea.trim() || !message.trim()) {
       return res.status(400).json({ error: "baseArea와 message는 필수입니다." });
@@ -540,7 +553,6 @@ app.post("/api/search-with-pref", async (req, res) => {
 
     // 3) 네이버 지역 검색 수행
     const allResults = [];
-
     let foodResults = [];
 
     try {
@@ -612,7 +624,7 @@ app.post("/api/search-with-pref", async (req, res) => {
     }));
 
     // 7) 스코어링 에이전트로 점수 계산 + 정렬
-    const startPoint = context?.startPoint || null; // { lat, lng } 형식이라고 가정
+    const startPoint = bodyStartPoint || context?.startPoint || null; // { lat, lng } 형식이라고 가정
     const scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
 
     return res.json({ prefs: safePrefs, weights, city, pois: scoredPOIs });
@@ -717,9 +729,9 @@ No explanations. No JSON. No system messages.
     `;
 
     if (!genAIClient) {
-        return res.status(500).json({
-            error: "Gemini 클라이언트가 초기화되지 않았습니다.",
-        });
+      return res.status(500).json({
+        error: "Gemini 클라이언트가 초기화되지 않았습니다.",
+      });
     }
 
     const aiModel = genAIClient.getGenerativeModel({ model: modelName });
