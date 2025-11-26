@@ -1,3 +1,9 @@
+import {
+  MEAL_WINDOWS,
+  toMinutes,
+  toTimeString,
+} from "../utils/timeConstants.js";
+
 /* ===================== 샘플 POI/기본 위치 ===================== */
 /**
  * 실제 서비스에서는 네이버 검색 결과(basePOIs)를 사용하고,
@@ -126,33 +132,40 @@ export function selectPOIs(
   const maxRestaurants = Math.max(0, numMealSlots);
   const maxCafes = cafe ? 1 : 0; // 카페는 기본적으로 1곳만
 
-  // 2) 필수 방문지 이름 목록 (중복 방지용)
+  // 2) 필수 방문지 중복 제거 (Step A-3: 정규화 방식으로 개선)
+  // 필수 방문지 이름 정규화 함수
+  const normalizeKorean = (str) => {
+    if (!str || typeof str !== "string") return "";
+    return str.replace(/\s+/g, "").toLowerCase();
+  };
+
   const requiredNames = new Set(
     (requiredStops || [])
-      .map((r) => (r.name || "").trim().toLowerCase())
+      .map((r) => normalizeKorean(r.name))
       .filter(Boolean)
   );
 
-  // 3) POI 분리: 식당 / 카페 / 기타 (필수 방문지와 중복 제거)
+  // 중복 제거: 필수 방문지와 이름이 유사한 POI 필터링
+  const dedupedPOIs = basePOIs.filter((poi) => {
+    const poiName = normalizeKorean(poi.title || poi.name);
+    if (!poiName) return false;
+
+    for (const reqName of requiredNames) {
+      // 포함 관계 체크 (경복궁, 경복궁역, 경복궁 돌담길 등)
+      if (poiName.includes(reqName) || reqName.includes(poiName)) {
+        return false; // 중복이므로 제외
+      }
+    }
+    return true; // 중복 없음, 포함
+  });
+
+  // 3) POI 분리: 식당 / 카페 / 기타 (필수 방문지와 중복 제거된 POI 사용)
   const restaurantPOIs = [];
   const cafePOIs = [];
   const otherPOIs = [];
   const categoryCounts = {}; // 카테고리별 개수 추적 (최대 2개 제한)
 
-  for (const p of basePOIs) {
-    // 필수 방문지와 이름이 같거나 매우 비슷한 POI 제외
-    const poiName = (p.name || "").trim().toLowerCase();
-    if (requiredNames.has(poiName)) continue;
-    
-    // 이름이 부분적으로 겹치는 경우도 제외 (예: "경복궁" vs "경복궁 정문")
-    let isDuplicate = false;
-    for (const reqName of requiredNames) {
-      if (poiName.includes(reqName) || reqName.includes(poiName)) {
-        isDuplicate = true;
-        break;
-      }
-    }
-    if (isDuplicate) continue;
+  for (const p of dedupedPOIs) {
 
     // 카테고리별 개수 제한 (최대 2개)
     const category = p.category || p.categoryType || "기타";
@@ -378,7 +391,7 @@ export function optimizeRoute(
   const startNode = { lat: start.lat, lon: start.lon };
   const endNode = { lat: end.lat, lon: end.lon };
 
-  // 2) 필수 방문지 → POI 형태로 변환 + isRequired 플래그
+  // 2) 필수 방문지 → POI 형태로 변환 + isMustVisit 플래그 (Step A-5)
   const pace = weights?.pace?.stayTimeMultiplier ? 
     (weights.pace.stayTimeMultiplier >= 1.2 ? "relaxed" : 
      weights.pace.stayTimeMultiplier <= 0.8 ? "tight" : "normal") : "normal";
@@ -396,6 +409,7 @@ export function optimizeRoute(
         category,
         rating: r.rating ?? "-",
         isRequired: true,
+        isMustVisit: true, // Step A-5: 필수 방문지 강제 포함 플래그
       };
     });
 
@@ -425,13 +439,14 @@ export function optimizeRoute(
     poi: null,
   });
 
-  // 1..k: 필수 + 선택
+  // 1..k: 필수 + 선택 (Step A-5: 필수 방문지는 isMustVisit 플래그 포함)
   requiredAsPOIs.forEach((p) =>
     nodes.push({
       type: "poi",
       lat: p.lat,
       lon: p.lon,
       poi: p,
+      isMustVisit: p.isMustVisit || false, // Step A-5: 필수 방문지 강제 포함 플래그
     })
   );
   optional.forEach((p) =>
@@ -440,6 +455,7 @@ export function optimizeRoute(
       lat: p.lat,
       lon: p.lon,
       poi: p,
+      isMustVisit: false, // 선택 POI는 필수 아님
     })
   );
 
@@ -474,18 +490,83 @@ export function optimizeRoute(
   waits[0] = 0;
   stays[0] = 0;
 
-  // 식사 시간대 슬롯 정의 (분 단위)
-  const MEAL_WINDOWS = {
-    lunch: { start: 11 * 60 + 30, end: 13 * 60 + 30 }, // 11:30~13:30
-    dinner: { start: 17 * 60 + 30, end: 19 * 60 + 30 }, // 17:30~19:30
-    cafe: { start: 14 * 60, end: 16 * 60 }, // 14:00~16:00
-  };
+  // Step B-1: 끼니 시간대 슬롯 정의 (timeConstants.js의 MEAL_WINDOWS 사용)
+  // MEAL_WINDOWS를 분 단위로 변환
+  const mealSlots = [];
+  if (mealOptions.breakfast) {
+    const win = MEAL_WINDOWS.breakfast;
+    mealSlots.push({
+      type: "meal",
+      meal: "breakfast",
+      idealStart: toMinutes(win.start),
+      idealEnd: toMinutes(win.end),
+    });
+  }
+  if (mealOptions.lunch) {
+    const win = MEAL_WINDOWS.lunch;
+    mealSlots.push({
+      type: "meal",
+      meal: "lunch",
+      idealStart: toMinutes(win.start),
+      idealEnd: toMinutes(win.end),
+    });
+  }
+  if (mealOptions.dinner) {
+    const win = MEAL_WINDOWS.dinner;
+    mealSlots.push({
+      type: "meal",
+      meal: "dinner",
+      idealStart: toMinutes(win.start),
+      idealEnd: toMinutes(win.end),
+    });
+  }
+  if (mealOptions.cafe) {
+    const win = MEAL_WINDOWS.cafe;
+    mealSlots.push({
+      type: "meal",
+      meal: "cafe",
+      idealStart: toMinutes(win.start),
+      idealEnd: toMinutes(win.end),
+    });
+  }
 
-  // 끼니 슬롯 추적 (각 시간대에 식당/카페가 배치되었는지)
-  const mealSlotsFilled = {
-    lunch: false,
-    dinner: false,
-    cafe: false,
+  // Step B-1: 사용자의 일정 범위(startMin~endMin) 내에 있는 끼니 슬롯만 필터링
+  const activeMealSlots = mealSlots.filter(
+    (slot) => slot.idealStart >= startMin && slot.idealEnd <= endMin
+  );
+
+  // Step B-1: 끼니 슬롯 추적 (각 시간대에 식당/카페가 배치되었는지)
+  const mealSlotsFilled = {};
+  activeMealSlots.forEach((slot) => {
+    mealSlotsFilled[slot.meal] = false;
+  });
+
+  // Step B-1: 식당 POI가 현재 시간에 배치 가능한지 체크하는 함수
+  const canPlaceRestaurant = (poi, currentTimeMin, mealSlots) => {
+    const category = poi.category || poi.categoryType || "";
+    const isRestaurant = category === "restaurant";
+    const isCafe = category === "cafe";
+
+    // 식당/카페가 아니면 항상 배치 가능
+    if (!isRestaurant && !isCafe) return true;
+
+    // 식당/카페는 끼니 시간대에만 배치 가능
+    for (const slot of mealSlots) {
+      const arrivalTime = currentTimeMin;
+      // 시간대 내에 들어가면 배치 가능 (30분 여유 포함)
+      if (
+        arrivalTime >= slot.idealStart - 30 &&
+        arrivalTime <= slot.idealEnd + 30
+      ) {
+        // 해당 슬롯이 아직 채워지지 않았으면 배치 가능
+        if (!mealSlotsFilled[slot.meal]) {
+          return true;
+        }
+      }
+    }
+
+    // 끼니 시간대가 아니거나 이미 채워진 슬롯이면 배치 불가
+    return false;
   };
 
   while (remaining.size) {
@@ -505,48 +586,53 @@ export function optimizeRoute(
       // 시간/최대 구간 제약 체크 + endTime 초과 방지
       const arrivalTime = now + leg;
       const departTime = arrivalTime + stay;
-      
-      // 식사 시간대 슬롯 점수 계산
+
+      // Step A-5: 필수 방문지는 시간/거리 제약 무시
+      const node = routeArray[idx][1];
+      const isMustVisit = node?.isMustVisit || poi.isMustVisit || false;
+
+      // Step B-1: 식당/카페는 끼니 시간대에만 배치 가능 (필수 방문지 제외)
+      if (!isMustVisit) {
+        if (!canPlaceRestaurant(poi, arrivalTime, activeMealSlots)) {
+          continue; // 끼니 시간대가 아니면 스킵
+        }
+      }
+
+      // Step A-5: mustVisit이면 조건 무시, 아니면 조건 체크
+      if (!isMustVisit) {
+        if (arrivalTime < now) continue; // 시간 역전 방지
+        if (departTime > endMin) continue; // endTime 초과 방지
+        if (leg > maxLegMin) continue; // 최대 이동시간 초과 방지
+      }
+
+      // Step B-1: 식사 시간대 슬롯 점수 계산 (우선순위 부여)
       let mealSlotScore = 0;
       const category = poi.category || poi.categoryType || "";
-      const isRestaurant = category === "restaurant" || category === "restaurant";
+      const isRestaurant = category === "restaurant";
       const isCafe = category === "cafe";
-      
-      // 점심 시간대 (11:30~13:30)
-      if (mealOptions.lunch && isRestaurant && !mealSlotsFilled.lunch) {
-        const lunchWindow = MEAL_WINDOWS.lunch;
-        if (arrivalTime >= lunchWindow.start - 30 && arrivalTime <= lunchWindow.end + 30) {
-          mealSlotScore += 100; // 높은 우선순위
-        } else if (arrivalTime < lunchWindow.start) {
-          // 점심 시간대 전이면 약간의 보너스 (시간대에 맞춰 배치 가능)
-          mealSlotScore += 20;
+
+      for (const slot of activeMealSlots) {
+        if (mealSlotsFilled[slot.meal]) continue; // 이미 채워진 슬롯은 무시
+
+        if (
+          (slot.meal === "lunch" && isRestaurant) ||
+          (slot.meal === "dinner" && isRestaurant) ||
+          (slot.meal === "cafe" && isCafe) ||
+          (slot.meal === "breakfast" && isRestaurant)
+        ) {
+          if (
+            arrivalTime >= slot.idealStart - 30 &&
+            arrivalTime <= slot.idealEnd + 30
+          ) {
+            mealSlotScore += slot.meal === "cafe" ? 80 : 100; // 식당은 100, 카페는 80
+          } else if (arrivalTime < slot.idealStart) {
+            mealSlotScore += 20; // 시간대 전이면 약간의 보너스
+          }
         }
       }
-      
-      // 저녁 시간대 (17:30~19:30)
-      if (mealOptions.dinner && isRestaurant && !mealSlotsFilled.dinner) {
-        const dinnerWindow = MEAL_WINDOWS.dinner;
-        if (arrivalTime >= dinnerWindow.start - 30 && arrivalTime <= dinnerWindow.end + 30) {
-          mealSlotScore += 100; // 높은 우선순위
-        } else if (arrivalTime < dinnerWindow.start) {
-          mealSlotScore += 20;
-        }
-      }
-      
-      // 카페 시간대 (14:00~16:00)
-      if (mealOptions.cafe && isCafe && !mealSlotsFilled.cafe) {
-        const cafeWindow = MEAL_WINDOWS.cafe;
-        if (arrivalTime >= cafeWindow.start - 30 && arrivalTime <= cafeWindow.end + 30) {
-          mealSlotScore += 80; // 카페는 식당보다 약간 낮은 우선순위
-        }
-      }
-      
-      // 기본 제약 조건 확인
-      if (
-        arrivalTime >= now && // 시간 역전 방지
-        departTime <= endMin && // endTime 초과 방지
-        leg <= maxLegMin
-      ) {
+
+      // 기본 제약 조건 확인 (mustVisit은 이미 위에서 처리됨)
+      if (true) {
         // 식사 슬롯 점수가 높으면 우선 선택 (거리보다 우선)
         if (mealSlotScore > 0) {
           // 식사 슬롯이 채워지지 않았고, 이 POI가 해당 시간대에 맞으면 우선 선택
@@ -575,7 +661,43 @@ export function optimizeRoute(
     }
 
     if (bestIdx == null) {
-      // 더 이상 시간 안에 갈 수 있는 곳이 없으면 종료
+      // Step A-5: 더 이상 시간 안에 갈 수 있는 곳이 없으면, 필수 방문지가 남아있는지 확인
+      const remainingMustVisit = Array.from(remaining).filter(
+        (idx) => routeArray[idx][1]?.isMustVisit
+      );
+
+      if (remainingMustVisit.length > 0) {
+        // 필수 방문지가 남아있으면 강제로 추가 (시간 제약 무시)
+        const forcedIdx = remainingMustVisit[0];
+        const [__, forcedNode] = routeArray[forcedIdx];
+        const forcedPoi = forcedNode?.poi || {};
+        const forcedStay = Math.max(
+          10,
+          Math.round(
+            forcedPoi.stay_time ??
+              getStayTime(forcedPoi.category || "spot", pace, weights)
+          )
+        );
+        const forcedLeg = travelMinutes(
+          curNode.lat,
+          curNode.lon,
+          forcedNode.lat,
+          forcedNode.lon
+        );
+
+        waits[forcedIdx] = forcedLeg;
+        stays[forcedIdx] = forcedStay;
+        now = now + forcedLeg + forcedStay;
+        route.push(forcedIdx);
+        remaining.delete(forcedIdx);
+        currentIdx = forcedIdx;
+        console.warn(
+          `⚠️ 필수 방문지 "${forcedPoi.name}"를 강제로 추가했습니다 (시간 제약 무시).`
+        );
+        continue;
+      }
+
+      // 필수 방문지도 없으면 종료
       break;
     }
 
@@ -594,27 +716,29 @@ export function optimizeRoute(
     waits[bestIdx] = bestLeg;
     stays[bestIdx] = stay;
 
-    // 식사 시간대 슬롯 채움 여부 업데이트
+    // Step B-1: 식사 시간대 슬롯 채움 여부 업데이트
     const selectedPoi = routeArray[bestIdx][1]?.poi;
     const selectedCategory = selectedPoi?.category || selectedPoi?.categoryType || "";
     const arrivalTimeForMeal = now + bestLeg;
-    
-    if (mealOptions.lunch && (selectedCategory === "restaurant") && !mealSlotsFilled.lunch) {
-      const lunchWindow = MEAL_WINDOWS.lunch;
-      if (arrivalTimeForMeal >= lunchWindow.start - 30 && arrivalTimeForMeal <= lunchWindow.end + 30) {
-        mealSlotsFilled.lunch = true;
-      }
-    }
-    if (mealOptions.dinner && (selectedCategory === "restaurant") && !mealSlotsFilled.dinner) {
-      const dinnerWindow = MEAL_WINDOWS.dinner;
-      if (arrivalTimeForMeal >= dinnerWindow.start - 30 && arrivalTimeForMeal <= dinnerWindow.end + 30) {
-        mealSlotsFilled.dinner = true;
-      }
-    }
-    if (mealOptions.cafe && (selectedCategory === "cafe") && !mealSlotsFilled.cafe) {
-      const cafeWindow = MEAL_WINDOWS.cafe;
-      if (arrivalTimeForMeal >= cafeWindow.start - 30 && arrivalTimeForMeal <= cafeWindow.end + 30) {
-        mealSlotsFilled.cafe = true;
+
+    for (const slot of activeMealSlots) {
+      if (mealSlotsFilled[slot.meal]) continue; // 이미 채워진 슬롯은 무시
+
+      const isRestaurant = selectedCategory === "restaurant";
+      const isCafe = selectedCategory === "cafe";
+
+      if (
+        (slot.meal === "lunch" && isRestaurant) ||
+        (slot.meal === "dinner" && isRestaurant) ||
+        (slot.meal === "cafe" && isCafe) ||
+        (slot.meal === "breakfast" && isRestaurant)
+      ) {
+        if (
+          arrivalTimeForMeal >= slot.idealStart - 30 &&
+          arrivalTimeForMeal <= slot.idealEnd + 30
+        ) {
+          mealSlotsFilled[slot.meal] = true;
+        }
       }
     }
 
@@ -675,7 +799,7 @@ export function optimizeRoute(
     }
   }
 
-  // 6) 호텔(도착지)를 항상 마지막으로 강제 포함
+  // Step A-4: 호텔(도착지)를 항상 마지막으로 강제 포함
   // Hard Constraint: 시간 제약이 있어도 호텔은 반드시 포함
   if (currentIdx !== n - 1) {
     const [__, lastNode] = routeArray[currentIdx];
@@ -687,17 +811,25 @@ export function optimizeRoute(
       endNode2.lon
     );
 
-    // 호텔까지 이동시간이 endTime을 초과하면, 중간 POI를 제거하여 시간 확보
+    // Step A-4: 호텔까지 이동시간이 endTime을 초과하면, 중간 POI를 제거하여 시간 확보
+    // 단, 필수 방문지는 제거하지 않음
     while (now + legToEnd > endMin && route.length > 1) {
       const removedIdx = route.pop();
       if (removedIdx === 0 || removedIdx === n - 1) {
         // start/end는 제거 불가, 강제로 호텔 추가
         break;
       }
+      // Step A-5: 필수 방문지는 제거하지 않음
+      const [_____, removedNode] = routeArray[removedIdx];
+      if (removedNode?.isMustVisit) {
+        // 필수 방문지는 다시 추가하고 종료
+        route.push(removedIdx);
+        break;
+      }
       // 제거된 POI의 시간을 빼기
       now -= (waits[removedIdx] || 0) + (stays[removedIdx] || 0);
       currentIdx = route[route.length - 1];
-      const [____, prevNode] = routeArray[currentIdx];
+      const [______, prevNode] = routeArray[currentIdx];
       // 호텔까지 거리 재계산
       legToEnd = travelMinutes(
         prevNode.lat,
@@ -707,22 +839,24 @@ export function optimizeRoute(
       );
     }
 
-    // 호텔은 무조건 추가 (시간 초과해도 경고만)
-    if (legToEnd <= maxLegMin) {
-      waits[n - 1] = legToEnd;
-      stays[n - 1] = 0;
-      route.push(n - 1);
-      
-      // endTime 초과 시 경고 (하지만 포함은 함)
-      if (now + legToEnd > endMin) {
-        console.warn(`⚠️ 호텔 도착 예상 시간이 종료 시간을 ${now + legToEnd - endMin}분 초과합니다.`);
-      }
-    } else {
-      // maxLegMin 초과 시에도 호텔은 포함 (이동시간이 길어도)
-      waits[n - 1] = legToEnd;
-      stays[n - 1] = 0;
-      route.push(n - 1);
-      console.warn(`⚠️ 호텔까지 이동시간(${legToEnd}분)이 최대 구간 제한(${maxLegMin}분)을 초과합니다.`);
+    // Step A-4: 호텔은 무조건 추가 + 경고 플래그
+    const isOverTime = now + legToEnd > endMin;
+    const isOverDistance = legToEnd > maxLegMin;
+
+    waits[n - 1] = legToEnd;
+    stays[n - 1] = 0;
+    route.push(n - 1);
+
+    // Step A-4: 경고 메시지 출력
+    if (isOverTime) {
+      console.warn(
+        `⚠️ 도착 예정 시간이 ${endMin}분을 초과합니다. (현재: ${now + legToEnd}분)`
+      );
+    }
+    if (isOverDistance) {
+      console.warn(
+        `⚠️ 호텔까지 이동시간(${legToEnd}분)이 최대 구간 제한(${maxLegMin}분)을 초과합니다.`
+      );
     }
   }
 

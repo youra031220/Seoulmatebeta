@@ -64,6 +64,9 @@ export default function App() {
   const [waitTolerance, setWaitTolerance] = useState("medium"); // "low" | "medium" | "high"
   const [hoveredWait, setHoveredWait] = useState(null);
 
+  /** 여행 페이스 (여유/보통/알차게) */
+  const [pace, setPace] = useState("normal"); // relaxed | normal | tight
+
   /** 이동 / 장소 옵션 */
   const [maxLeg, setMaxLeg] = useState("60"); // 구간당 최대 이동시간(분)
   const [numPlaces, setNumPlaces] = useState("6"); // 총 방문 장소 수
@@ -425,6 +428,7 @@ export default function App() {
             endHour,
             themes,
             requiredStops,
+            pace,
           },
         }),
       });
@@ -435,11 +439,26 @@ export default function App() {
       }
 
       const data = await res.json();
-      const { prefs, pois, weights: weightsFromServer } = data || {};
+      const { prefs, pois, weights: weightsFromServer, biasReport } = data || {};
       
       // weights 저장 (체류시간 계산용)
       if (weightsFromServer) {
         setWeights(weightsFromServer);
+      }
+
+      // 편향 리포트가 있으면 챗봇 로그에 안내 메시지 추가
+      if (biasReport?.isBiased) {
+        const issuesText = (biasReport.issues || []).join("\n• ");
+        const suggestionsText = (biasReport.suggestions || []).join("\n");
+
+        setWishLog((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            role: "assistant",
+            text: `📊 추천 결과를 간단히 분석해봤어요:\n• ${issuesText}\n\n💡 ${suggestionsText}`,
+          },
+        ]);
       }
 
       // Naver local API raw → routePlanner용 형식으로 변환
@@ -527,6 +546,7 @@ export default function App() {
             endHour,
             themes,
             requiredStops,
+            pace,
           },
           anchor: {
             name: anchor.name,
@@ -697,8 +717,8 @@ const handleSendWish = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: text,
-        context: {
+          message: text,
+          context: {
           breakfast,
           lunch,
           dinner,
@@ -712,9 +732,10 @@ const handleSendWish = async () => {
           endHour,
           themes,
           requiredStops,
+          pace,
           // 🔴 여기! turn 정보를 함께 보냄
           turn: userTurn,
-        },
+          },
       }),
     });
 
