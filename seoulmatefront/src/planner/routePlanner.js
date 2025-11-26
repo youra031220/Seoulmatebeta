@@ -282,12 +282,36 @@ export function selectPOIs(
 /* ===================== 경로 최적화 ===================== */
 
 /**
+ * 카테고리별 기본 체류시간 계산 (pace 배수 적용)
+ * @param {string} category - POI 카테고리 (restaurant, cafe, attraction, poi 등)
+ * @param {string} pace - 여행 페이스 (relaxed, normal, tight)
+ * @param {Object} weights - weightAgent가 생성한 가중치 객체 (pace.stayTimeMultiplier 포함)
+ * @returns {number} 체류시간(분)
+ */
+function getStayTime(category, pace = "normal", weights = {}) {
+  // 카테고리별 기본 체류시간 (분)
+  const baseStayTimes = {
+    restaurant: 60,
+    cafe: 45,
+    attraction: 90,
+    poi: 90,
+    required: 30,
+    spot: 60,
+  };
+
+  const baseTime = baseStayTimes[category] || 60;
+  const multiplier = weights?.pace?.stayTimeMultiplier ?? 1.0;
+  return Math.max(10, Math.round(baseTime * multiplier));
+}
+
+/**
  * 간단한 그리디 알고리즘으로
  * - 출발지(startPoint) → 필수 방문지(requiredStops) → 선택 POI(pois) → 도착지(endPoint)
  * 순서를 정하고, 각 구간 이동시간과 체류시간을 계산합니다.
  *
  * - maxLegMin: 한 구간 최대 이동시간(분)
  * - startMin, endMin: 일정 시작/종료 시각 (분 단위, 0~1440)
+ * - weights: weightAgent가 생성한 가중치 객체 (pace.stayTimeMultiplier 포함)
  */
 export function optimizeRoute(
   pois,
@@ -296,7 +320,8 @@ export function optimizeRoute(
   startMin,
   endMin,
   maxLegMin,
-  requiredStops = []
+  requiredStops = [],
+  weights = {}
 ) {
   if (!start?.lat || !end?.lat) {
     throw new Error("start / end 좌표가 없습니다.");
@@ -307,28 +332,40 @@ export function optimizeRoute(
   const endNode = { lat: end.lat, lon: end.lon };
 
   // 2) 필수 방문지 → POI 형태로 변환 + isRequired 플래그
+  const pace = weights?.pace?.stayTimeMultiplier ? 
+    (weights.pace.stayTimeMultiplier >= 1.2 ? "relaxed" : 
+     weights.pace.stayTimeMultiplier <= 0.8 ? "tight" : "normal") : "normal";
+  
   const requiredAsPOIs = (requiredStops || [])
     .filter((r) => r.lat && r.lon)
-    .map((r) => ({
-      name: r.name || "필수 방문지",
-      lat: r.lat,
-      lon: r.lon,
-      stay_time: r.stay_time ?? 30,
-      category: r.category || "required",
-      rating: r.rating ?? "-",
-      isRequired: true,
-    }));
+    .map((r) => {
+      const category = r.category || "required";
+      const calculatedStayTime = getStayTime(category, pace, weights);
+      return {
+        name: r.name || "필수 방문지",
+        lat: r.lat,
+        lon: r.lon,
+        stay_time: r.stay_time ?? calculatedStayTime,
+        category,
+        rating: r.rating ?? "-",
+        isRequired: true,
+      };
+    });
 
   // 3) 선택 POI (이미 selectPOIs에서 numPlaces만큼 뽑힌 상태라고 가정)
-  const optional = (pois || []).map((p) => ({
-    name: p.name,
-    lat: p.lat,
-    lon: p.lon,
-    stay_time: p.stay_time ?? 60,
-    category: p.category || "spot",
-    rating: p.rating ?? "-",
-    isRequired: false,
-  }));
+  const optional = (pois || []).map((p) => {
+    const category = p.category || p.categoryType || "spot";
+    const calculatedStayTime = getStayTime(category, pace, weights);
+    return {
+      name: p.name,
+      lat: p.lat,
+      lon: p.lon,
+      stay_time: p.stay_time ?? calculatedStayTime,
+      category,
+      rating: p.rating ?? "-",
+      isRequired: false,
+    };
+  });
 
   // 4) start + (필수 + 선택) + end 순서로 routeArray 구성
   const nodes = [];
@@ -399,55 +436,104 @@ export function optimizeRoute(
     for (const idx of remaining) {
       const [__, cand] = routeArray[idx];
       const leg = travelMinutes(curNode.lat, curNode.lon, cand.lat, cand.lon);
-      if (leg < bestLeg && now + leg + (cand?.poi?.stay_time ?? 30) <= endMin && leg <= maxLegMin) {
+
+      // 체류시간 계산
+      const poi = cand?.poi || {};
+      const stay = Math.max(10, Math.round(poi.stay_time ?? getStayTime(poi.category || "spot", pace, weights)));
+      
+      // 시간/최대 구간 제약 체크 + endTime 초과 방지
+      const arrivalTime = now + leg;
+      const departTime = arrivalTime + stay;
+      
+      if (
+        leg < bestLeg &&
+        arrivalTime >= now && // 시간 역전 방지: 도착시간이 현재시간보다 빠르면 안됨
+        departTime <= endMin && // endTime 초과 방지
+        leg <= maxLegMin
+      ) {
         bestLeg = leg;
         bestIdx = idx;
       }
     }
 
-    if (bestIdx == null) break;
+    if (bestIdx == null) {
+      // 더 이상 시간 안에 갈 수 있는 곳이 없으면 종료
+      break;
+    }
 
     const [__, nextNode] = routeArray[bestIdx];
     const poi = nextNode.poi || {};
-    const stay = Math.max(10, Math.round(poi.stay_time ?? 30));
+    const stay = Math.max(10, Math.round(poi.stay_time ?? getStayTime(poi.category || "spot", pace, weights)));
+
+    // 시간 역전 방지: 도착시간이 이전 출발시간보다 빠르면 안됨
+    const arrivalTime = now + bestLeg;
+    if (arrivalTime < now) {
+      // 시간 역전 발생 시 이 POI는 건너뛰기
+      remaining.delete(bestIdx);
+      continue;
+    }
 
     waits[bestIdx] = bestLeg;
     stays[bestIdx] = stay;
 
-    now += bestLeg + stay;
+    now = arrivalTime + stay; // 도착시간 + 체류시간 = 출발시간
     route.push(bestIdx);
     remaining.delete(bestIdx);
     currentIdx = bestIdx;
   }
 
-  // 6) 마지막으로 도착지까지 이동
+  // 6) 호텔(도착지)를 항상 마지막으로 강제 포함
+  // 시간 제약이 있어도 호텔은 반드시 포함되도록, 필요시 중간 POI를 제거
   if (currentIdx !== n - 1) {
-      const [__, lastNode] = routeArray[currentIdx];
-      const [___, endNode2] = routeArray[n - 1];
-      const legToEnd = travelMinutes(
-        lastNode.lat,
-        lastNode.lon,
-        endNode2.lat,
-        endNode2.lon
-      );
+    const [__, lastNode] = routeArray[currentIdx];
+    const [___, endNode2] = routeArray[n - 1];
+    const legToEnd = travelMinutes(
+      lastNode.lat,
+      lastNode.lon,
+      endNode2.lat,
+      endNode2.lon
+    );
 
-      if (now + legToEnd <= endMin && legToEnd <= maxLegMin) {
-        waits[n - 1] = legToEnd;
-        stays[n - 1] = 0;
-        route.push(n - 1);
-      } else {
-        //console.log("End point skipped due to time constraints.");
+    // 호텔까지 이동시간이 endTime을 초과하면, 중간 POI를 제거하여 시간 확보
+    if (now + legToEnd > endMin) {
+      // 마지막 POI부터 역순으로 제거하여 호텔 도착 시간 확보
+      while (route.length > 1 && now + legToEnd > endMin) {
+        const removedIdx = route.pop();
+        if (removedIdx === 0 || removedIdx === n - 1) break; // start/end는 제거 불가
+        now -= (waits[removedIdx] || 0) + (stays[removedIdx] || 0);
+        currentIdx = route[route.length - 1];
+        const [____, prevNode] = routeArray[currentIdx];
+        const recalcLeg = travelMinutes(
+          prevNode.lat,
+          prevNode.lon,
+          endNode2.lat,
+          endNode2.lon
+        );
+        if (now + recalcLeg <= endMin && recalcLeg <= maxLegMin) {
+          break;
+        }
       }
+    }
+
+    // 호텔 도착이 가능한 경우에만 추가
+    const finalLegToEnd = travelMinutes(
+      routeArray[route[route.length - 1]][1].lat,
+      routeArray[route[route.length - 1]][1].lon,
+      endNode2.lat,
+      endNode2.lon
+    );
+    
+    if (now + finalLegToEnd <= endMin && finalLegToEnd <= maxLegMin) {
+      waits[n - 1] = finalLegToEnd;
+      stays[n - 1] = 0;
+      route.push(n - 1);
+    }
   }
 
-  // Sort the route based on waits (travel time)
-  const sortedRoute = [...route];
-  sortedRoute.sort((a, b) => (waits[a] || 0) - (waits[b] || 0));
-  
-  return { routeArray, route: sortedRoute, waits, stays };
+  // ❗ 핵심: "정렬" 안 한다. 방문 순서(route)에 그대로 따라감.
+  // 호텔(도착지)가 마지막이 되도록 route를 그대로 사용한다.
+  return { routeArray, route, waits, stays };
 }
-
-
 /* ===================== 일정 생성 (시간표) ===================== */
 
 /**
@@ -466,6 +552,7 @@ export function generateSchedule(
 ) {
   const rows = [];
   let now = startMin;
+  let prevDepart = startMin; // 이전 출발 시간 추적
 
   for (let i = 0; i < route.length; i++) {
     const idx = route[i];
@@ -480,11 +567,45 @@ export function generateSchedule(
         : poi?.category || "";
 
     const wait = waits[idx] || 0;
-    now += wait;
+    
+    // 시간 역전 방지: 도착시간이 이전 출발시간보다 빠르면 안됨
+    const arrivalTime = Math.max(prevDepart, now + wait);
+    now = arrivalTime;
     const arrival = toHM(now);
 
     const stay = stays[idx] || 0;
-    now += stay;
+    const departTime = now + stay;
+    
+    // endTime 초과 방지: 출발시간이 endTime을 넘으면 안됨
+    if (departTime > endMin) {
+      // endTime을 초과하는 경우, 체류시간을 조정하여 endTime에 맞춤
+      const adjustedStay = Math.max(0, endMin - now);
+      now = endMin;
+      const depart = toHM(now);
+      
+      const rating = poi?.rating ?? null;
+      const name =
+        type === "start"
+          ? startName
+          : type === "end"
+          ? endName
+          : poi?.name || "";
+
+      rows.push({
+        order: i + 1,
+        name,
+        category,
+        arrival,
+        depart,
+        wait,
+        stay: adjustedStay,
+        rating,
+      });
+      break; // endTime 초과 시 이후 일정 중단
+    }
+    
+    now = departTime;
+    prevDepart = now; // 다음 반복을 위해 업데이트
     const depart = toHM(now);
 
     const rating = poi?.rating ?? null;

@@ -640,6 +640,191 @@ app.post("/api/search-with-pref", async (req, res) => {
       );
   }
 });
+// 8️⃣ 취향 + 앵커 기반 부분 재추천 (/api/route/refine)
+// - 기존 검색 결과와 상관없이, 현재 사용자가 마음에 들어한 장소(anchor)를 기준으로
+//   근처 + 비슷한 테마의 후보를 다시 가져오는 API입니다.
+// - 프론트에서는 일정이 만들어진 뒤, 특정 장소 카드에서
+//   "이 근처 더 보기 / 비슷한 곳 추천" 버튼을 눌렀을 때 호출하는 용도로 사용할 수 있습니다.
+app.post("/api/route/refine", async (req, res) => {
+  try {
+    const {
+      baseArea = "",
+      message = "",
+      context = {},
+      anchor = null,          // { name, lat, lon, category, rating }
+      dislikedNames = [],     // 싫어요 한 장소 이름 목록 (string[])
+    } = req.body || {};
+
+    if (!baseArea.trim() || !message.trim()) {
+      return res.status(400).json({ error: "baseArea와 message는 필수입니다." });
+    }
+
+    if (!anchor || !anchor.lat || !anchor.lon) {
+      return res.status(400).json({ error: "anchor(기준 장소)의 lat/lon이 필요합니다." });
+    }
+
+    console.log("🧭 /api/route/refine 요청 (anchor):", anchor.name || "");
+
+    // 1) 다시 한 번 취향 분석 (message + context 기반)
+    let prefs;
+    try {
+      prefs = await analyzeTravelPreference(message, context);
+    } catch (error) {
+      console.error("❌ /api/route/refine Gemini 실패:", error?.message || error);
+      return res
+        .status(500)
+        .json(
+          buildErrorResponse(
+            "취향 분석 중 외부 API 오류가 발생했습니다.",
+            error
+          )
+        );
+    }
+
+    const safePrefs = prefs && typeof prefs === "object" ? prefs : {};
+    const prefsForWeight = buildPrefsForWeight(safePrefs, context || {});
+    const weights = generateWeights(prefsForWeight || {});
+    const { valid, errors } = validateWeights(weights);
+    if (!valid) console.warn("⚠️ Weight validation failed (refine):", errors);
+
+    // 2) 취향 기반 검색 쿼리 구성 (기존 search-with-pref와 동일)
+    const { city, poiQueries, foodQueries } = buildSearchQueriesFromPreference(
+      safePrefs,
+      baseArea
+    );
+
+    console.log(
+      `🧭 refine 검색 쿼리 - POI ${poiQueries.length}개, Food ${foodQueries.length}개 (city=${city})`
+    );
+
+    // 3) 네이버 지역 검색 호출
+    const allResults = [];
+    let foodResults = [];
+
+    try {
+      for (const q of poiQueries) {
+        console.log("🔍 [refine] 네이버 지역 검색(Poi):", q);
+        const items = await naverLocalSearch(q, 10);
+        allResults.push(...items);
+      }
+
+      for (const q of foodQueries) {
+        console.log("🔍 [refine] 네이버 지역 검색(Food):", q);
+        const items = await naverLocalSearch(q, 10);
+        foodResults.push(...items);
+        allResults.push(...items);
+      }
+    } catch (error) {
+      console.error("❌ [refine] 네이버 지역 검색 실패:", error?.message || error);
+      return res
+        .status(500)
+        .json(
+          buildErrorResponse(
+            "외부 API 호출 중 오류가 발생했습니다.",
+            error
+          )
+        );
+    }
+
+    // 4) 음식점이 전혀 없으면 fallback
+    const classifiedFood = foodResults.map((item) => ({
+      ...item,
+      categoryType: classifyItem(item),
+    }));
+
+    let restaurantCount = classifiedFood.filter(
+      (i) => i.categoryType === "restaurant" || i.categoryType === "cafe"
+    ).length;
+
+    if (restaurantCount === 0) {
+      const fallbackQuery = buildCityQuery(city, "가성비 맛집");
+      console.log("🍚 [refine] 음식점 Fallback 호출:", fallbackQuery);
+      try {
+        const fallbackItems = await naverLocalSearch(fallbackQuery, 10);
+        fallbackItems.forEach((it) => allResults.push(it));
+      } catch (error) {
+        console.error("❌ [refine] 음식점 Fallback 실패:", error?.message || error);
+        return res
+          .status(500)
+          .json(
+            buildErrorResponse(
+              "외부 API 호출 중 오류가 발생했습니다.",
+              error
+            )
+          );
+      }
+    }
+
+    // 5) "싫어요" 한 이름들은 필터링
+    const dislikeSet = new Set(
+      (dislikedNames || [])
+        .filter(Boolean)
+        .map((n) => n.toString().trim().toLowerCase())
+    );
+
+    function stripHtmlTitle(title) {
+      if (!title) return "";
+      // 네이버 지역 검색 title은 <b>태그가 섞여 있으므로 제거
+      return title.replace(/<[^>]+>/g, "").trim();
+    }
+
+    const filtered = allResults.filter((item) => {
+      const plainTitle = stripHtmlTitle(item.title || "");
+      const key = plainTitle.toLowerCase();
+      if (!key) return false;
+      if (dislikeSet.has(key)) return false;
+      return true;
+    });
+
+    // 6) 중복 제거 + categoryType 태그 붙이기
+    const uniqueMap = new Map();
+    for (const item of filtered) {
+      const key = `${item.telephone || ""}_${stripHtmlTitle(item.title || "")}`;
+      if (!uniqueMap.has(key)) {
+        uniqueMap.set(key, item);
+      }
+    }
+
+    const pois = Array.from(uniqueMap.values()).map((item) => ({
+      ...item,
+      categoryType: classifyItem(item),
+    }));
+
+    // 7) 기준 anchor 주변 / 취향 기반 점수 계산
+    const anchorPoint = { lat: anchor.lat, lng: anchor.lon };
+    const scoredPOIs = scorePOIs(pois, safePrefs, weights, anchorPoint);
+
+    // 8) 상위 N개만 반환 (너무 많지 않게)
+    const TOP_N = 20;
+    const top = scoredPOIs
+      .slice()
+      .sort((a, b) => (b._score ?? 0) - (a._score ?? 0))
+      .slice(0, TOP_N);
+
+    return res.json({
+      prefs: safePrefs,
+      weights,
+      city,
+      anchor: {
+        name: anchor.name,
+        lat: anchor.lat,
+        lon: anchor.lon,
+        category: anchor.category || null,
+      },
+      pois: top,
+    });
+  } catch (error) {
+    console.error("❌ /api/route/refine 처리 실패:", error?.message || error);
+    return res
+      .status(500)
+      .json(
+        buildErrorResponse(
+          "경로 재추천(refine) 중 오류가 발생했습니다.",
+          error
+        )
+      );
+  }
+});
 
 // 6️⃣ Gemini 여행 취향 요약 멘트 (자연어)
 app.post("/api/travel-wish", async (req, res) => {

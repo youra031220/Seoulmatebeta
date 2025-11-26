@@ -9,7 +9,7 @@ import google.generativeai as genai
 
 전제:
     - 환경변수 GEMINI_API_KEY 설정 필요
-    - 모델 이름은 gemini-2.0-flash 기준 (원하면 변경 가능)
+    - 모델 이름은 gemini-2.5-pro 기준 (원하면 변경 가능)
 """
 
 SYSTEM_INSTRUCTIONS = """
@@ -63,7 +63,7 @@ def main():
 
     genai.configure(api_key=api_key)
 
-    model = genai.GenerativeModel("gemini-2.0-flash")  # 필요시 버전 변경 가능
+    model = genai.GenerativeModel("gemini-2.5-pro")  # 필요시 버전 변경 가능
 
     prompt = build_prompt(file_path, purpose, original_code)
 

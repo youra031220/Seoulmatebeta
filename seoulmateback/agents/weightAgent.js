@@ -22,6 +22,7 @@ export function generateWeights(prefs) {
       distanceWeight: 0,
       timeWeight: 0,
       relaxationBonus: 0,
+      stayTimeMultiplier: 1.0,
     },
     // 테마/태그 매칭 가중치
     theme: {
@@ -65,14 +66,17 @@ export function generateWeights(prefs) {
     weights.pace.distanceWeight = -0.3; // 거리가 멀면 페널티
     weights.pace.timeWeight = -0.2; // 시간이 오래 걸리면 페널티
     weights.pace.relaxationBonus = 0.5; // 여유로운 장소 보너스
+    weights.pace.stayTimeMultiplier = 1.3; // 체류시간 30% 증가
   } else if (pace === "normal") {
     weights.pace.distanceWeight = -0.15;
     weights.pace.timeWeight = -0.1;
     weights.pace.relaxationBonus = 0.2;
+    weights.pace.stayTimeMultiplier = 1.0; // 기본 체류시간
   } else if (pace === "tight") {
     weights.pace.distanceWeight = -0.4; // 빡빡한 일정에선 거리가 중요
     weights.pace.timeWeight = -0.3;
     weights.pace.relaxationBonus = 0;
+    weights.pace.stayTimeMultiplier = 0.7; // 체류시간 30% 감소
   }
 
   // 3. 테마/태그 매칭 가중치 설정
@@ -156,7 +160,7 @@ export function validateWeights(weights) {
 
   // 3. pace 필드 검증
   if (weights.pace) {
-    const paceFields = ['distanceWeight', 'timeWeight', 'relaxationBonus'];
+    const paceFields = ['distanceWeight', 'timeWeight', 'relaxationBonus', 'stayTimeMultiplier'];
     for (const field of paceFields) {
       if (typeof weights.pace[field] !== 'number') {
         errors.push(`weights.pace.${field} must be a number`);

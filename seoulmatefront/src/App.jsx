@@ -80,6 +80,9 @@ export default function App() {
 
   /** 네이버 검색 기반 POI (실제 장소 목록) */
   const [searchPois, setSearchPois] = useState([]);
+  
+  /** 백엔드에서 받은 가중치 (체류시간 계산용) */
+  const [weights, setWeights] = useState(null);
 
   
 
@@ -404,7 +407,12 @@ export default function App() {
       }
 
       const data = await res.json();
-      const { prefs, pois } = data || {};
+      const { prefs, pois, weights: weightsFromServer } = data || {};
+      
+      // weights 저장 (체류시간 계산용)
+      if (weightsFromServer) {
+        setWeights(weightsFromServer);
+      }
 
       // Naver local API raw → routePlanner용 형식으로 변환
       const converted =
@@ -515,7 +523,8 @@ export default function App() {
       startMin,
       endMin,
       maxLegNum,
-      requiredStops // 필수 방문지 포함
+      requiredStops, // 필수 방문지 포함
+      weights || {} // 가중치 (체류시간 계산용)
     );
 
     // ✅ 4) 시간별 일정 생성
