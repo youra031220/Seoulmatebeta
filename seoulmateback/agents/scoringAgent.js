@@ -155,9 +155,10 @@ export function checkAvoidMatch(poi, avoidItem, prefs) {
  * @param {Object} prefs - 여행 취향
  * @param {Object} weights - weightAgent가 만든 가중치
  * @param {Object} startPoint - { lat, lng } 시작점(예: 숙소/출발지)
+ * @param {Object} anchor - { lat, lon, category, rating } 앵커 장소 (옵셔널, refine API용)
  * @returns {Object} 점수 정보가 포함된 poi
  */
-export function scorePOI(poi, prefs, weights, startPoint) {
+export function scorePOI(poi, prefs, weights, startPoint, anchor = null) {
   if (!poi || typeof poi !== "object") return poi;
 
   // 0. 안전장치
@@ -193,7 +194,21 @@ export function scorePOI(poi, prefs, weights, startPoint) {
     if (distanceKm != null) {
       // pace.distanceWeight는 보통 음수
       const safeDistanceKm = normalizeNumber(distanceKm, 0);
-      const distanceWeight = normalizeNumber(paceW.distanceWeight, 0);
+      let distanceWeight = normalizeNumber(paceW.distanceWeight, 0);
+      
+      // C. 테마 매칭 시 거리 페널티 50% 감소
+      let hasThemeMatch = false;
+      if (Array.isArray(prefs.themes) && prefs.themes.length > 0) {
+        hasThemeMatch = prefs.themes.some((theme) => checkTagMatch(poi, theme));
+      }
+      if (Array.isArray(prefs.poiTags) && prefs.poiTags.length > 0) {
+        hasThemeMatch = hasThemeMatch || prefs.poiTags.some((tag) => checkTagMatch(poi, tag));
+      }
+      
+      if (hasThemeMatch) {
+        distanceWeight = distanceWeight * 0.5; // 거리 페널티 50% 감소
+      }
+      
       distanceScore = safeDistanceKm * distanceWeight;
       // 너무 과하게 깎이지 않도록 최소/최대 제한
       distanceScore = clampNumber(
@@ -305,7 +320,35 @@ export function scorePOI(poi, prefs, weights, startPoint) {
     }
   }
 
-  // 8. 전체 합산 후 0~10으로 정규화
+  // 8. 앵커 기반 유사도 점수 (refine API용)
+  let anchorScore = 0;
+  if (anchor && anchor.lat && anchor.lon && poiPoint) {
+    // 앵커와의 거리 계산 (가까울수록 높은 점수)
+    const anchorPoint = { lat: anchor.lat, lng: anchor.lon };
+    const anchorDistanceKm = calculateDistance(anchorPoint, poiPoint);
+    
+    if (anchorDistanceKm != null && anchorDistanceKm <= 5) {
+      // 5km 이내면 거리 기반 보너스 (가까울수록 높음)
+      const distanceBonus = Math.max(0, (5 - anchorDistanceKm) / 5) * 0.5; // 최대 0.5점
+      anchorScore += distanceBonus;
+    }
+    
+    // 카테고리 유사도 보너스
+    const poiCategory = poi.categoryType || poi.category || "";
+    const anchorCategory = anchor.category || anchor.categoryType || "";
+    if (poiCategory === anchorCategory) {
+      anchorScore += 0.3; // 같은 카테고리면 보너스
+    }
+    
+    // 평점 유사도 보너스
+    const anchorRating = normalizeNumber(anchor.rating, 0);
+    const poiRating = normalizeNumber(poi.rating, DEFAULT_RATING);
+    if (Math.abs(anchorRating - poiRating) <= 0.5) {
+      anchorScore += 0.2; // 평점이 비슷하면 보너스
+    }
+  }
+
+  // 9. 전체 합산 후 0~10으로 정규화
   let totalScore =
     SCORE_BASELINE + // 기준점
     baseScore +
@@ -314,7 +357,8 @@ export function scorePOI(poi, prefs, weights, startPoint) {
     themeScore +
     categoryScore +
     dietScore +
-    paceRelaxScore;
+    paceRelaxScore +
+    anchorScore;
 
   const safeTotalScore = clampNumber(totalScore, SCORE_MIN, SCORE_MAX, SCORE_MIN);
 
@@ -336,12 +380,18 @@ export function scorePOI(poi, prefs, weights, startPoint) {
 
 /**
  * POI 리스트 스코어링 + 정렬
+ * @param {Array} pois - POI 배열
+ * @param {Object} prefs - 여행 취향
+ * @param {Object} weights - 가중치
+ * @param {Object} startPoint - 시작점
+ * @param {Object} anchor - 앵커 장소 (옵셔널, refine API용)
+ * @returns {Array} 점수화된 POI 배열 (정렬됨)
  */
-export function scorePOIs(pois, prefs, weights, startPoint) {
+export function scorePOIs(pois, prefs, weights, startPoint, anchor = null) {
   if (!Array.isArray(pois)) return [];
 
   const scored = pois.map((poi) =>
-    scorePOI(poi, prefs || {}, weights || {}, startPoint)
+    scorePOI(poi, prefs || {}, weights || {}, startPoint, anchor)
   );
 
   // 점수 내림차순 정렬

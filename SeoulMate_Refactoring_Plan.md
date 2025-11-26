@@ -247,7 +247,127 @@ now + leg + stayTime + legToEnd <= endMin
 
 ---
 
-### 2.10 추가 발견 문제
+### 2.10 스크린샷 기반 추가 발견 문제 (2차 분석)
+
+#### 스크린샷 2차 분석 결과
+
+```
+설정:
+  - 출발: 서울역 09:00
+  - 도착: 뉴서울호텔 (종료시간: 20시)
+  - 점심 ✅, 저녁 ✅
+  - 필수 방문지: 경복궁
+
+실제 결과:
+  1. 서울역 09:00~09:00 (출발)
+  2. 덕수궁 09:21~10:21 (궁궐)
+  3. 도랑 10:41~11:41 (중식당) ← ❌ 점심인데 10:41 시작
+  4. 경복궁 11:47~12:17 (required) ← 필수 방문지
+  5. 경복궁 12:17~13:17 (궁궐) ← ❌ 경복궁 2번 나옴!
+  6. 창덕궁 13:38~14:38 (궁궐)
+  7. 창경궁 14:44~15:44 (궁궐)
+  8. 고궁의아침 15:51~16:51 (한식) ← ❌ 저녁인데 15:51 시작
+  9. 뉴서울호텔 17:20 (도착) ← ❌ 20시인데 17:20 도착
+```
+
+---
+
+### 2.11 문제 10: 식사 시간대가 여전히 무시됨
+
+| 항목 | 내용 |
+|------|------|
+| **현상** | 점심 10:41 시작, 저녁 15:51 시작 |
+| **기대값** | 점심 11:30~13:30, 저녁 17:30~19:30 |
+| **원인** | 끼니 슬롯 예약 로직이 아직 미구현 |
+| **결과** | 식당이 "가까운 순서"로 아무 때나 배치됨 |
+
+---
+
+### 2.12 문제 11: 일정이 너무 일찍 끝남 (endMin 미활용)
+
+| 항목 | 내용 |
+|------|------|
+| **현상** | 종료시간 20:00인데 17:20에 도착 |
+| **손실** | 약 2시간 40분의 여행 시간 미활용 |
+| **원인 위치** | `routePlanner.js` `optimizeRoute()` |
+| **원인** | • Greedy가 "갈 수 있는 곳이 없으면" 바로 종료<br>• endMin까지 채우려는 시도 없음<br>• 남은 시간에 추가 POI 탐색 안 함 |
+
+```javascript
+// 현재 코드 (문제)
+if (bestIdx == null) {
+  break;  // 더 이상 시간 내 갈 수 있는 곳이 없으면 종료
+}
+
+// 필요한 로직
+// 1. 현재 시간과 endMin 사이에 여유가 있는지 확인
+// 2. 여유가 있으면 더 먼 곳의 POI도 검색 범위에 포함
+// 3. 또는 체류 시간을 늘려서 시간 채우기
+```
+
+---
+
+### 2.13 문제 12: 필수 방문지 중복 + 과도한 영향
+
+| 항목 | 내용 |
+|------|------|
+| **현상 1** | 경복궁이 4번(required)과 5번(일반 POI)에 2번 나옴 |
+| **원인** | • `selectPOIs()`가 requiredStops 중복 체크 안 함<br>• 네이버 검색 결과에 "경복궁"이 포함되어 일반 POI로도 선택됨 |
+
+| 항목 | 내용 |
+|------|------|
+| **현상 2** | 경복궁 근처 궁궐만 추천 (덕수궁, 창덕궁, 창경궁) |
+| **원인** | • 거리 기반 Greedy가 가까운 것만 선택<br>• 경복궁 주변 = 궁궐 밀집 지역<br>• 다른 테마(맛집, K-pop, 카페)는 멀어서 탈락 |
+
+```
+사용자가 선택한 테마: 문화·전시·역사, 자연·공원, K-pop 관련
+실제 추천된 카테고리: 궁궐, 궁궐, 궁궐, 궁궐...
+
+문제: "거리 최적화"가 "다양성"을 완전히 희생시킴
+```
+
+#### 해결 방향
+
+```javascript
+// 1. 필수 방문지 중복 제거
+const requiredNames = new Set(requiredStops.map(r => r.name.toLowerCase()));
+const filteredPOIs = scoredPOIs.filter(poi => 
+  !requiredNames.has(poi.name.toLowerCase())
+);
+
+// 2. 카테고리 다양성 보장
+const categoryCount = {};
+const MAX_SAME_CATEGORY = 2;  // 같은 카테고리는 최대 2개
+
+function shouldSelectPOI(poi) {
+  const cat = poi.category || 'etc';
+  if ((categoryCount[cat] || 0) >= MAX_SAME_CATEGORY) {
+    return false;  // 이미 해당 카테고리가 충분함
+  }
+  categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+  return true;
+}
+
+// 3. 거리 페널티 완화 + 다양성 보너스
+function adjustedScore(poi, weights) {
+  let score = poi._score;
+  
+  // 다양성 보너스: 아직 선택 안 된 카테고리면 +1점
+  if ((categoryCount[poi.category] || 0) === 0) {
+    score += 1.0;
+  }
+  
+  // 테마 매칭 보너스: 사용자가 선택한 테마면 +0.5점
+  if (userThemes.includes(poi.theme)) {
+    score += 0.5;
+  }
+  
+  return score;
+}
+```
+
+---
+
+### 2.14 추가 발견 문제 (1차 분석)
 
 #### A. 중복 POI 검색 (API 비용 낭비)
 - `handleSendWish()`에서 Gemini 호출 → 결과 버림
@@ -270,6 +390,103 @@ now + leg + stayTime + legToEnd <= endMin
 ---
 
 ## 3. Design Proposal - 설계 제안
+
+### 3.0 ⭐ 제약 조건 우선순위 (Critical)
+
+스케줄링 시 반드시 지켜야 할 **제약 조건의 우선순위**입니다.
+
+#### 우선순위 계층
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1️⃣ HARD CONSTRAINT (절대 위반 불가)                              │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ • 출발지 + 출발 시간                                      │    │
+│  │ • 도착지 + 도착 시간                                      │    │
+│  │ → 무조건 일정의 처음과 끝에 고정                           │    │
+│  └─────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│  2️⃣ HARD CONSTRAINT (절대 포함)                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ • 필수 방문지 (requiredStops)                             │    │
+│  │ → 시간이 부족해도 무조건 일정에 포함                        │    │
+│  │ → 다른 선택 POI를 줄여서라도 필수 방문지는 확보             │    │
+│  └─────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│  3️⃣ SOFT CONSTRAINT (가능한 반영)                                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ • 사용자 선호 (themes, dietPrefs, poiTags 등)             │    │
+│  │ • 챗봇 대화로 파인튜닝된 prefs                             │    │
+│  │ → scoringAgent의 가중치로 반영                            │    │
+│  │ → 높은 점수의 POI를 우선 선택                              │    │
+│  └─────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│  4️⃣ SOFT CONSTRAINT (시간대 배치)                                │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ • 끼니 시간대 (breakfast/lunch/dinner/cafe)              │    │
+│  │   - 아침: 07:30 ~ 09:30                                  │    │
+│  │   - 점심: 11:30 ~ 13:30                                  │    │
+│  │   - 카페: 14:00 ~ 16:00                                  │    │
+│  │   - 저녁: 17:30 ~ 19:30                                  │    │
+│  │ → 해당 시간대에 식당/카페를 "슬롯 예약"                     │    │
+│  └─────────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────────┤
+│  5️⃣ OPTIMIZATION (최적화)                                        │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │ • 이동 거리 최소화                                        │    │
+│  │ • 이동 수단 고려 (도보/대중교통/차량)                      │    │
+│  │ → 위 1~4 제약을 모두 만족한 후에 거리 기반 최적화          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 현재 코드의 문제점
+
+| 우선순위 | 현재 상태 | 문제 |
+|----------|-----------|------|
+| 1️⃣ 출발/도착 | ⚠️ 부분 구현 | 도착지(호텔)가 조건부로만 포함됨 |
+| 2️⃣ 필수 방문지 | ❌ 미작동 | `requiredStops`가 전달되지만 Greedy가 건너뜀 |
+| 3️⃣ 사용자 선호 | ✅ 작동 | scoringAgent로 점수 계산 중 |
+| 4️⃣ 끼니 시간대 | ❌ 미구현 | 시간대 개념 자체가 없음 |
+| 5️⃣ 이동 거리 | ✅ 작동 | Greedy Nearest-Neighbor로 구현 중 |
+
+**핵심 문제**: 5번(이동 거리)이 1~4번보다 우선 적용되고 있음!
+
+#### 스크린샷 사례 분석
+
+```
+사용자 입력:
+  - 출발: 서울역 09:00
+  - 도착: 뉴서울호텔 18:00
+  - 필수 방문지: 경복궁 ← 일정에 없음! ❌
+  - 점심: ✅, 저녁: ✅
+  
+실제 결과:
+  1. 서울역 09:00~09:00 (출발)
+  2. 난로연 남영점 09:16~10:16 (식당) ← 아침 시간에 점심용 식당 ❌
+  3. 홍게집숯불닭갈비 10:18~11:18 (식당) ← 또 식당 ❌
+  4. 식품명인체험홍보관 12:18~13:18 (관광지) ← 점심 시간에 관광지 ❌
+  5. 서울풍물시장... 14:10~15:10 ← 마지막이 호텔 아님 ❌
+  
+누락된 것:
+  - 경복궁 (필수 방문지)
+  - 저녁 식사 (dinner=true인데 없음)
+  - 호텔 도착 (도착지)
+```
+
+#### 올바른 결과 예시
+
+```
+우선순위 적용 후 예상 결과:
+  1. 서울역 09:00 (출발) ← 1️⃣ Hard
+  2. 경복궁 09:30~11:00 (필수 방문지) ← 2️⃣ Hard
+  3. [점심 식당] 11:30~12:30 ← 4️⃣ 시간대
+  4. [관광지 A] 13:00~14:30 ← 3️⃣ 선호 기반
+  5. [카페] 15:00~15:40 ← 4️⃣ 시간대 (cafe=true일 경우)
+  6. [관광지 B] 16:00~17:00 ← 3️⃣ 선호 기반
+  7. [저녁 식당] 17:30~18:30 ← 4️⃣ 시간대
+  8. 뉴서울호텔 19:00 (도착) ← 1️⃣ Hard
+```
 
 ### 3.1 책임 분리 원칙
 
@@ -310,39 +527,240 @@ App.jsx (좋아요/싫어요/교체 요청)
         └── 응답: { itineraryState (updated), schedule, routePath }
 ```
 
-### 3.3 Skeleton 기반 스케줄링 설계
+### 3.3 Skeleton 기반 스케줄링 설계 (제약 조건 우선순위 반영)
+
+#### Phase 1: Hard Constraint 뼈대 생성
 
 ```javascript
-// 새로운 scheduleBuilder.js (백엔드)
-
-// Step 1: Skeleton 생성
+// Step 1-1: 출발/도착 고정 (우선순위 1️⃣)
 skeleton = [
-  { type: "start", time: startMin, place: startPoint },
-  { type: "must", time: null, place: requiredStops[0] },
-  { type: "must", time: null, place: requiredStops[1] },
-  { type: "end", time: endMin, place: endPoint },
+  { type: "start", timeMin: startMin, place: startPoint, fixed: true },
+  { type: "end", timeMin: endMin, place: endPoint, fixed: true },
 ];
 
-// Step 2: 구간별 Available Window 계산
-windows = [
-  { from: "start", to: "must0", availableMin: 120 },
-  { from: "must0", to: "must1", availableMin: 90 },
-  { from: "must1", to: "end", availableMin: 60 },
-];
+// Step 1-2: 필수 방문지 삽입 (우선순위 2️⃣)
+// 필수 방문지는 무조건 들어가야 함 - 시간 부족하면 다른 POI를 줄임
+for (const must of requiredStops) {
+  skeleton.splice(-1, 0, {  // end 바로 앞에 삽입
+    type: "must",
+    timeMin: null,  // 아직 시간 미정
+    place: must,
+    fixed: true,
+    stayTime: getStayTime(must.category, pace),
+  });
+}
 
-// Step 3: 각 Window에 POI 채우기 (시간 역순 불가능하게)
-for (window of windows) {
-  candidatePOIs = filterByDistance(window.from, window.to);
-  while (window.remainingTime > minStayTime) {
-    bestPOI = selectBest(candidatePOIs, weights);
-    if (canFit(bestPOI, window)) {
-      window.stops.push(bestPOI);
-      window.remainingTime -= (travelTime + stayTime);
-    }
+// 이 시점의 skeleton 예시:
+// [start(09:00)] → [must:경복궁] → [end(18:00)]
+```
+
+#### Phase 2: 끼니 슬롯 예약
+
+```javascript
+// Step 2: 끼니 시간대 슬롯 삽입 (우선순위 4️⃣)
+const MEAL_WINDOWS = {
+  breakfast: { idealStart: 7*60+30, idealEnd: 9*60+30, duration: 60 },
+  lunch:     { idealStart: 11*60+30, idealEnd: 13*60+30, duration: 60 },
+  dinner:    { idealStart: 17*60+30, idealEnd: 19*60+30, duration: 60 },
+  cafe:      { idealStart: 14*60, idealEnd: 16*60, duration: 40 },
+};
+
+const mealSlots = [];
+if (lunch) mealSlots.push({ type: "meal", meal: "lunch", ...MEAL_WINDOWS.lunch });
+if (dinner) mealSlots.push({ type: "meal", meal: "dinner", ...MEAL_WINDOWS.dinner });
+if (breakfast) mealSlots.push({ type: "meal", meal: "breakfast", ...MEAL_WINDOWS.breakfast });
+if (cafe) mealSlots.push({ type: "meal", meal: "cafe", ...MEAL_WINDOWS.cafe });
+
+// 시간순 정렬 후 skeleton에 삽입
+mealSlots.sort((a, b) => a.idealStart - b.idealStart);
+
+for (const slot of mealSlots) {
+  // 사용자의 일정 범위 내에 있는지 확인
+  if (slot.idealStart >= startMin && slot.idealEnd <= endMin) {
+    insertMealSlotIntoSkeleton(skeleton, slot);
   }
 }
 
-// Step 4: 시간표 생성 (arrival < prevDeparture 절대 불가)
+// 이 시점의 skeleton 예시:
+// [start(09:00)] → [must:경복궁] → [meal:lunch(11:30~13:30)] 
+//   → [meal:dinner(17:30~19:30)] → [end(18:00)]
+// 
+// ⚠️ dinner가 end(18:00) 이후면 조정 필요!
+```
+
+#### Phase 3: Available Window 계산
+
+```javascript
+// Step 3: 각 고정 슬롯 사이의 여유 시간 계산
+function calculateWindows(skeleton) {
+  const windows = [];
+  
+  for (let i = 0; i < skeleton.length - 1; i++) {
+    const from = skeleton[i];
+    const to = skeleton[i + 1];
+    
+    const fromEndTime = from.timeMin + (from.stayTime || 0);
+    const toStartTime = to.timeMin || to.idealStart;
+    
+    const travelTime = estimateTravelTime(from.place, to.place);
+    const availableTime = toStartTime - fromEndTime - travelTime;
+    
+    windows.push({
+      fromIdx: i,
+      toIdx: i + 1,
+      fromPlace: from.place,
+      toPlace: to.place,
+      availableMin: Math.max(0, availableTime),
+      travelMin: travelTime,
+    });
+  }
+  
+  return windows;
+}
+
+// 결과 예시:
+// windows = [
+//   { from: "start", to: "경복궁", availableMin: 0 },      // 바로 이동
+//   { from: "경복궁", to: "lunch", availableMin: 30 },     // 30분 여유
+//   { from: "lunch", to: "dinner", availableMin: 240 },   // 4시간 여유 ← 관광지 배치
+//   { from: "dinner", to: "end", availableMin: 0 },        // 바로 이동
+// ]
+```
+
+#### Phase 4: 여유 시간에 POI 채우기
+
+```javascript
+// Step 4: 선호 기반 POI 선택 (우선순위 3️⃣) + 거리 최적화 (우선순위 5️⃣)
+function fillWindowsWithPOIs(windows, scoredPOIs, weights) {
+  const usedPOIs = new Set();
+  
+  for (const window of windows) {
+    if (window.availableMin < 30) continue;  // 최소 30분 이상 여유 있을 때만
+    
+    // 이 구간 내에서 갈 수 있는 POI들 필터링
+    const candidates = scoredPOIs.filter(poi => {
+      if (usedPOIs.has(poi.id)) return false;
+      
+      const travelFromPrev = estimateTravelTime(window.fromPlace, poi);
+      const travelToNext = estimateTravelTime(poi, window.toPlace);
+      const totalNeeded = travelFromPrev + poi.stayTime + travelToNext;
+      
+      return totalNeeded <= window.availableMin;
+    });
+    
+    // 점수 높은 순으로 정렬 (이미 scoringAgent가 정렬해줌)
+    // 거리 최적화는 candidates 내에서 추가 고려
+    candidates.sort((a, b) => {
+      const scoreA = a._score;
+      const scoreB = b._score;
+      // 점수가 비슷하면 (0.5점 이내) 거리로 결정
+      if (Math.abs(scoreA - scoreB) < 0.5) {
+        const distA = estimateTravelTime(window.fromPlace, a);
+        const distB = estimateTravelTime(window.fromPlace, b);
+        return distA - distB;
+      }
+      return scoreB - scoreA;
+    });
+    
+    // 가능한 많이 채우기
+    let remainingTime = window.availableMin;
+    let currentPlace = window.fromPlace;
+    
+    for (const poi of candidates) {
+      const travelTime = estimateTravelTime(currentPlace, poi);
+      const needed = travelTime + poi.stayTime;
+      
+      if (needed <= remainingTime) {
+        window.stops = window.stops || [];
+        window.stops.push(poi);
+        usedPOIs.add(poi.id);
+        remainingTime -= needed;
+        currentPlace = poi;
+      }
+    }
+  }
+}
+```
+
+#### Phase 5: 최종 타임라인 생성
+
+```javascript
+// Step 5: 시간 역전 방지 + 최종 검증
+function generateTimeline(skeleton, windows) {
+  const timeline = [];
+  let currentTime = skeleton[0].timeMin;  // 출발 시간
+  
+  for (let i = 0; i < skeleton.length; i++) {
+    const node = skeleton[i];
+    const window = windows[i - 1];  // 이전 구간
+    
+    // 이전 장소에서 이동
+    if (window) {
+      currentTime += window.travelMin;
+      
+      // 중간 POI들 추가
+      for (const poi of (window.stops || [])) {
+        timeline.push({
+          ...poi,
+          arrivalMin: currentTime,
+          departureMin: currentTime + poi.stayTime,
+        });
+        currentTime += poi.stayTime;
+        currentTime += estimateTravelTime(poi, node.place);  // 다음 장소까지
+      }
+    }
+    
+    // 현재 노드 추가
+    const arrival = currentTime;
+    const departure = currentTime + (node.stayTime || 0);
+    
+    // ⚠️ 시간 역전 검증
+    if (timeline.length > 0) {
+      const prev = timeline[timeline.length - 1];
+      if (arrival < prev.departureMin) {
+        console.error(`시간 역전! ${node.place.name} arrival=${arrival} < prev.departure=${prev.departureMin}`);
+        // 강제 조정
+        arrival = prev.departureMin + estimateTravelTime(prev.place, node.place);
+      }
+    }
+    
+    timeline.push({
+      ...node,
+      arrivalMin: arrival,
+      departureMin: departure,
+    });
+    
+    currentTime = departure;
+  }
+  
+  // ⚠️ 최종 검증: 마지막이 반드시 end(호텔)인지
+  const lastNode = timeline[timeline.length - 1];
+  if (lastNode.type !== "end") {
+    throw new Error("마지막 노드가 도착지(호텔)가 아닙니다!");
+  }
+  
+  return timeline;
+}
+```
+
+#### 전체 흐름 요약
+
+```
+입력: startPoint, endPoint, requiredStops, meals, scoredPOIs, pace
+
+Phase 1: [start] ────────────────────────────────── [end]
+              ↓ 필수 방문지 삽입
+Phase 1: [start] → [must:경복궁] ─────────────────── [end]
+              ↓ 끼니 슬롯 삽입  
+Phase 2: [start] → [must:경복궁] → [lunch] → [dinner] → [end]
+              ↓ 여유 시간 계산
+Phase 3: [start] → [경복궁] → [lunch] → [4시간 여유] → [dinner] → [end]
+              ↓ POI 채우기
+Phase 4: [start] → [경복궁] → [lunch] → [관광A] → [카페] → [관광B] → [dinner] → [end]
+              ↓ 타임라인 생성
+Phase 5: 09:00 → 09:30~11:00 → 11:30~12:30 → ... → 17:30~18:30 → 19:00
+
+출력: timeline[], itineraryState
 ```
 
 ### 3.4 API 역할 정의
@@ -598,16 +1016,182 @@ App.jsx
 
 ## 5. 구현 우선순위
 
-| 순서 | 작업 | 난이도 | 영향도 | 예상 소요 |
-|------|------|--------|--------|-----------|
-| 1 | 호텔 강제 포함 + 시간 역전 방지 | ⭐⭐ | 🔥🔥🔥 | 2-3시간 |
-| 2 | 체류 시간 카테고리별 적용 | ⭐ | 🔥🔥 | 1-2시간 |
-| 3 | 종료 시간 초과 방지 (호텔까지 시간 확보) | ⭐⭐ | 🔥🔥🔥 | 2-3시간 |
-| 4 | ItineraryState 타입 정의 + 서버 응답 구조 변경 | ⭐⭐⭐ | 🔥🔥 | 3-4시간 |
-| 5 | Skeleton 기반 스케줄링 구현 | ⭐⭐⭐⭐ | 🔥🔥🔥 | 6-8시간 |
-| 6 | 좋아요/싫어요 UI + /api/route/refine 연동 | ⭐⭐⭐ | 🔥🔥 | 4-5시간 |
-| 7 | 실제 도로 경로 표시 | ⭐⭐ | 🔥 | 2-3시간 |
-| 8 | POI 균형 조정 (음식 vs 관광지) | ⭐⭐ | 🔥 | 2-3시간 |
+### 제약 조건 기반 재정렬 (2차 업데이트)
+
+새로 발견된 문제점들을 반영하여 우선순위를 재정렬합니다.
+
+| 단계 | 작업 | 제약 조건 | 해결되는 문제 |
+|------|------|-----------|--------------|
+| **1** | **출발/도착 강제 포함** | 1️⃣ Hard | 호텔 누락 |
+| **2** | **필수 방문지 강제 포함 + 중복 제거** | 2️⃣ Hard | 경복궁 누락 & 2번 나옴 |
+| **3** | **endMin까지 일정 채우기** | 1️⃣ Hard | 17:20 조기 종료 (20시인데) |
+| **4** | **끼니 시간대 슬롯 예약** | 4️⃣ Soft | 점심 10:41, 저녁 15:51 |
+| **5** | **카테고리 다양성 보장** | 3️⃣ Soft | 궁궐만 4개 추천 |
+| **6** | **거리 페널티 완화** | 5️⃣ Optimization | 먼 곳의 좋은 POI 탈락 |
+
+### 상세 구현 계획
+
+#### Step 1-2: Hard Constraint 보장
+
+```javascript
+// 1. 호텔 무조건 포함 (시간 초과해도)
+// 2. 필수 방문지 무조건 포함
+// 3. 필수 방문지 이름으로 일반 POI에서 중복 제거
+
+const requiredNames = new Set(
+  requiredStops.map(r => normalizeKorean(r.name))
+);
+
+const dedupedPOIs = scoredPOIs.filter(poi => {
+  const normalized = normalizeKorean(poi.name);
+  // "경복궁", "경복궁역", "경복궁 돌담길" 등 유사 이름 제거
+  for (const reqName of requiredNames) {
+    if (normalized.includes(reqName) || reqName.includes(normalized)) {
+      return false;
+    }
+  }
+  return true;
+});
+```
+
+#### Step 3: endMin까지 일정 채우기
+
+```javascript
+// 현재: 갈 곳 없으면 바로 종료
+// 변경: endMin까지 여유 있으면 계속 탐색
+
+function shouldContinueScheduling(currentTime, endMin, endPoint, currentPlace) {
+  const travelToEnd = estimateTravelTime(currentPlace, endPoint);
+  const remainingTime = endMin - currentTime - travelToEnd;
+  
+  // 30분 이상 여유 있으면 계속 탐색
+  if (remainingTime >= 30) {
+    return true;
+  }
+  return false;
+}
+
+// 가까운 곳에 POI가 없으면?
+// → 검색 반경 확대 or 체류 시간 늘리기 or 먼 곳도 포함
+```
+
+#### Step 4: 끼니 시간대 슬롯 예약
+
+```javascript
+const MEAL_WINDOWS = {
+  breakfast: { start: 7*60+30, end: 9*60+30, duration: 60 },
+  lunch:     { start: 11*60+30, end: 13*60+30, duration: 60 },
+  dinner:    { start: 17*60+30, end: 19*60+30, duration: 60 },
+  cafe:      { start: 14*60, end: 16*60, duration: 40 },
+};
+
+// 식당 POI는 해당 시간대에만 배치 가능
+function canPlaceRestaurant(poi, currentTime) {
+  if (poi.categoryType !== 'restaurant') return true;
+  
+  // 점심 시간대인가?
+  if (lunch && currentTime >= MEAL_WINDOWS.lunch.start - 30 
+            && currentTime <= MEAL_WINDOWS.lunch.end) {
+    return true;
+  }
+  // 저녁 시간대인가?
+  if (dinner && currentTime >= MEAL_WINDOWS.dinner.start - 30 
+             && currentTime <= MEAL_WINDOWS.dinner.end) {
+    return true;
+  }
+  return false;  // 식당은 끼니 시간대만!
+}
+```
+
+#### Step 5: 카테고리 다양성 보장
+
+```javascript
+const MAX_SAME_CATEGORY = 2;  // 같은 세부 카테고리 최대 2개
+const categoryCount = {};
+
+function selectWithDiversity(candidates, numToSelect) {
+  const selected = [];
+  
+  // 점수 높은 순으로 정렬
+  const sorted = [...candidates].sort((a, b) => b._score - a._score);
+  
+  for (const poi of sorted) {
+    if (selected.length >= numToSelect) break;
+    
+    const cat = poi.detailCategory || poi.category || 'etc';
+    
+    // 같은 카테고리가 이미 MAX_SAME_CATEGORY개 있으면 스킵
+    if ((categoryCount[cat] || 0) >= MAX_SAME_CATEGORY) {
+      continue;
+    }
+    
+    selected.push(poi);
+    categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+  }
+  
+  return selected;
+}
+
+// 예시 결과:
+// Before: 궁궐, 궁궐, 궁궐, 궁궐 (전부 궁궐)
+// After:  궁궐, 궁궐, 전통체험, 카페 (다양하게)
+```
+
+#### Step 6: 거리 페널티 완화
+
+```javascript
+// 현재: distanceWeight = -0.3 ~ -0.4 (거리 멀면 크게 감점)
+// 변경: 점수가 높으면 거리 페널티 상쇄
+
+function adjustedDistancePenalty(poi, weights, userThemes) {
+  const basePenalty = poi.distanceKm * weights.pace.distanceWeight;
+  
+  // 테마 매칭 시 거리 페널티 50% 감소
+  const matchesTheme = userThemes.some(t => 
+    poi.tags?.includes(t) || poi.category?.includes(t)
+  );
+  
+  if (matchesTheme) {
+    return basePenalty * 0.5;  // 거리 페널티 절반
+  }
+  
+  return basePenalty;
+}
+
+// 예시:
+// K-pop 굿즈샵이 5km 떨어져 있어도
+// 사용자가 "K-pop 관련" 테마 선택했으면 거리 페널티 절반
+```
+
+### 구현 그룹 (업데이트)
+
+#### 🔴 Phase A: Hard Constraint 보장 (Step 1-3)
+> **목표**: 호텔 + 필수 방문지 + endMin까지 채우기
+
+```
+해결되는 문제:
+✅ 경복궁 누락
+✅ 경복궁 2번 나옴
+✅ 호텔 17:20 도착 (20시인데)
+```
+
+#### 🟡 Phase B: 시간대 배치 (Step 4)
+> **목표**: 점심/저녁이 올바른 시간대에
+
+```
+해결되는 문제:
+✅ 점심 10:41 시작 → 11:30~13:30으로
+✅ 저녁 15:51 시작 → 17:30~19:30으로
+```
+
+#### 🟢 Phase C: 다양성 확보 (Step 5-6)
+> **목표**: 궁궐만 4개 X → 다양한 카테고리
+
+```
+해결되는 문제:
+✅ 궁궐, 궁궐, 궁궐, 궁궐 → 궁궐, 체험, 카페, 맛집
+✅ K-pop 굿즈샵 (멀어도) 추천에 포함
+```
 
 ---
 
@@ -616,8 +1200,13 @@ App.jsx
 위 계획을 바탕으로, 구체적인 구현을 진행할 때는 다음과 같이 요청해주세요:
 
 ```
-"Step 1을 구현해줘" (호텔 강제 포함 + 시간 역전 방지)
-"Step 5를 구현해줘" (Skeleton 기반 스케줄링)
+"Phase A를 구현해줘" (Hard Constraint 보장)
+"Step 4를 구현해줘" (끼니 시간대 슬롯 예약)
 ```
+
+**권장 순서**:
+1. `Phase A` → 필수 방문지 + 호텔 문제 해결
+2. `Step 4` → 끼니 시간대 문제 해결
+3. 나머지는 순차적으로
 
 각 Step에 대해 구체적인 코드와 테스트 방법을 제공해드리겠습니다.

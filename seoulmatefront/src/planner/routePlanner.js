@@ -118,34 +118,69 @@ export function selectPOIs(
   cafe,
   dietPrefs = [],
   themes = [],
-  basePOIs = []
+  basePOIs = [],
+  requiredStops = []
 ) {
   // 1) 끼니 → 식당 슬롯 / 카페 슬롯 분리
   const numMealSlots = [breakfast, lunch, dinner].filter(Boolean).length;
   const maxRestaurants = Math.max(0, numMealSlots);
   const maxCafes = cafe ? 1 : 0; // 카페는 기본적으로 1곳만
 
-  // 2) POI 분리: 식당 / 카페 / 기타
+  // 2) 필수 방문지 이름 목록 (중복 방지용)
+  const requiredNames = new Set(
+    (requiredStops || [])
+      .map((r) => (r.name || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  // 3) POI 분리: 식당 / 카페 / 기타 (필수 방문지와 중복 제거)
   const restaurantPOIs = [];
   const cafePOIs = [];
   const otherPOIs = [];
+  const categoryCounts = {}; // 카테고리별 개수 추적 (최대 2개 제한)
 
   for (const p of basePOIs) {
+    // 필수 방문지와 이름이 같거나 매우 비슷한 POI 제외
+    const poiName = (p.name || "").trim().toLowerCase();
+    if (requiredNames.has(poiName)) continue;
+    
+    // 이름이 부분적으로 겹치는 경우도 제외 (예: "경복궁" vs "경복궁 정문")
+    let isDuplicate = false;
+    for (const reqName of requiredNames) {
+      if (poiName.includes(reqName) || reqName.includes(poiName)) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    if (isDuplicate) continue;
+
+    // 카테고리별 개수 제한 (최대 2개)
+    const category = p.category || p.categoryType || "기타";
+    const categoryKey = category.toLowerCase();
+    if (!categoryCounts[categoryKey]) {
+      categoryCounts[categoryKey] = 0;
+    }
+    if (categoryCounts[categoryKey] >= 2) continue; // 같은 카테고리는 최대 2개
+
     if (p.categoryType === "cafe") {
       cafePOIs.push(p);
+      categoryCounts[categoryKey]++;
     } else if (
       p.categoryType === "restaurant" ||
       (p.isFood && p.categoryType !== "cafe")
     ) {
       restaurantPOIs.push(p);
+      categoryCounts[categoryKey]++;
     } else {
       otherPOIs.push(p);
+      categoryCounts[categoryKey]++;
     }
   }
 
   const usedIds = new Set();
   const selectedRestaurants = [];
   const selectedCafes = [];
+  const selectedCategoryCounts = {}; // 선택된 POI의 카테고리별 개수
 
   const textOf = (p) =>
     (p.name || "") + " " + (p.address || "") + " " + (p.category || "");
@@ -153,7 +188,7 @@ export function selectPOIs(
   const containsAny = (str, keywords) =>
     keywords.some((kw) => str.toLowerCase().includes(kw.toLowerCase()));
 
-  // 3) 식단 제약별 키워드
+  // 4) 식단 제약별 키워드
   const dietKeywordMap = {
     halal: ["할랄", "halal"],
     vegan: ["비건", "vegan"],
@@ -163,7 +198,7 @@ export function selectPOIs(
     non_alcohol: ["논알콜", "무알콜", "non-alcohol", "0% 알콜"],
   };
 
-  // 3-1) 식단 제약 반영
+  // 4-1) 식단 제약 반영
   for (const diet of dietPrefs) {
     const keywords = dietKeywordMap[diet];
     if (!keywords) continue;
@@ -206,15 +241,18 @@ export function selectPOIs(
     }
   }
 
-  // 3-2) 남은 식당 슬롯 채우기
+  // 4-2) 남은 식당 슬롯 채우기 (카테고리 다양성 고려)
   for (const p of restaurantPOIs) {
     if (selectedRestaurants.length >= maxRestaurants) break;
     if (usedIds.has(p.id)) continue;
+    const cat = (p.category || p.categoryType || "기타").toLowerCase();
+    if (selectedCategoryCounts[cat] >= 2) continue; // 같은 카테고리는 최대 2개
     selectedRestaurants.push(p);
     usedIds.add(p.id);
+    selectedCategoryCounts[cat] = (selectedCategoryCounts[cat] || 0) + 1;
   }
 
-  // 3-3) 남은 카페 슬롯 채우기
+  // 4-3) 남은 카페 슬롯 채우기
   for (const p of cafePOIs) {
     if (selectedCafes.length >= maxCafes) break;
     if (usedIds.has(p.id)) continue;
@@ -229,7 +267,7 @@ export function selectPOIs(
     selectedFood = selectedFood.slice(0, numPlaces);
   }
 
-  // 4) 나머지 슬롯은 관광지(otherPOIs)로 채움
+  // 5) 나머지 슬롯은 관광지(otherPOIs)로 채움 (카테고리 다양성 고려)
   let remainingSlots = Math.max(0, numPlaces - selectedFood.length);
   const selectedPOIs = [];
 
@@ -244,29 +282,37 @@ export function selectPOIs(
     sns_hot: ["핫플", "인스타", "포토스팟", "포토 스팟"],
   };
 
-  // 4-1) 테마별로 1개씩 우선 배정
+  // 5-1) 테마별로 1개씩 우선 배정 (카테고리 다양성 고려)
   for (const th of themes) {
     if (selectedPOIs.length >= remainingSlots) break;
     const keywords = themeKeywordMap[th] || [];
 
     const candidate = otherPOIs.find(
-      (p) =>
-        !usedIds.has(p.id) &&
-        (keywords.length === 0 || containsAny(textOf(p), keywords))
+      (p) => {
+        if (usedIds.has(p.id)) return false;
+        const cat = (p.category || p.categoryType || "기타").toLowerCase();
+        if (selectedCategoryCounts[cat] >= 2) return false; // 같은 카테고리는 최대 2개
+        return keywords.length === 0 || containsAny(textOf(p), keywords);
+      }
     );
 
     if (candidate) {
       selectedPOIs.push(candidate);
       usedIds.add(candidate.id);
+      const cat = (candidate.category || candidate.categoryType || "기타").toLowerCase();
+      selectedCategoryCounts[cat] = (selectedCategoryCounts[cat] || 0) + 1;
     }
   }
 
-  // 4-2) 아직 남으면 any POI 채우기
+  // 5-2) 아직 남으면 any POI 채우기 (카테고리 다양성 고려)
   for (const p of otherPOIs) {
     if (selectedPOIs.length >= remainingSlots) break;
     if (usedIds.has(p.id)) continue;
+    const cat = (p.category || p.categoryType || "기타").toLowerCase();
+    if (selectedCategoryCounts[cat] >= 2) continue; // 같은 카테고리는 최대 2개
     selectedPOIs.push(p);
     usedIds.add(p.id);
+    selectedCategoryCounts[cat] = (selectedCategoryCounts[cat] || 0) + 1;
   }
 
   const finalList = [...selectedFood, ...selectedPOIs].slice(0, numPlaces);
@@ -321,7 +367,8 @@ export function optimizeRoute(
   endMin,
   maxLegMin,
   requiredStops = [],
-  weights = {}
+  weights = {},
+  mealOptions = {} // { breakfast, lunch, dinner, cafe }
 ) {
   if (!start?.lat || !end?.lat) {
     throw new Error("start / end 좌표가 없습니다.");
@@ -427,6 +474,20 @@ export function optimizeRoute(
   waits[0] = 0;
   stays[0] = 0;
 
+  // 식사 시간대 슬롯 정의 (분 단위)
+  const MEAL_WINDOWS = {
+    lunch: { start: 11 * 60 + 30, end: 13 * 60 + 30 }, // 11:30~13:30
+    dinner: { start: 17 * 60 + 30, end: 19 * 60 + 30 }, // 17:30~19:30
+    cafe: { start: 14 * 60, end: 16 * 60 }, // 14:00~16:00
+  };
+
+  // 끼니 슬롯 추적 (각 시간대에 식당/카페가 배치되었는지)
+  const mealSlotsFilled = {
+    lunch: false,
+    dinner: false,
+    cafe: false,
+  };
+
   while (remaining.size) {
     const [_, curNode] = routeArray[currentIdx];
 
@@ -445,14 +506,71 @@ export function optimizeRoute(
       const arrivalTime = now + leg;
       const departTime = arrivalTime + stay;
       
+      // 식사 시간대 슬롯 점수 계산
+      let mealSlotScore = 0;
+      const category = poi.category || poi.categoryType || "";
+      const isRestaurant = category === "restaurant" || category === "restaurant";
+      const isCafe = category === "cafe";
+      
+      // 점심 시간대 (11:30~13:30)
+      if (mealOptions.lunch && isRestaurant && !mealSlotsFilled.lunch) {
+        const lunchWindow = MEAL_WINDOWS.lunch;
+        if (arrivalTime >= lunchWindow.start - 30 && arrivalTime <= lunchWindow.end + 30) {
+          mealSlotScore += 100; // 높은 우선순위
+        } else if (arrivalTime < lunchWindow.start) {
+          // 점심 시간대 전이면 약간의 보너스 (시간대에 맞춰 배치 가능)
+          mealSlotScore += 20;
+        }
+      }
+      
+      // 저녁 시간대 (17:30~19:30)
+      if (mealOptions.dinner && isRestaurant && !mealSlotsFilled.dinner) {
+        const dinnerWindow = MEAL_WINDOWS.dinner;
+        if (arrivalTime >= dinnerWindow.start - 30 && arrivalTime <= dinnerWindow.end + 30) {
+          mealSlotScore += 100; // 높은 우선순위
+        } else if (arrivalTime < dinnerWindow.start) {
+          mealSlotScore += 20;
+        }
+      }
+      
+      // 카페 시간대 (14:00~16:00)
+      if (mealOptions.cafe && isCafe && !mealSlotsFilled.cafe) {
+        const cafeWindow = MEAL_WINDOWS.cafe;
+        if (arrivalTime >= cafeWindow.start - 30 && arrivalTime <= cafeWindow.end + 30) {
+          mealSlotScore += 80; // 카페는 식당보다 약간 낮은 우선순위
+        }
+      }
+      
+      // 기본 제약 조건 확인
       if (
-        leg < bestLeg &&
-        arrivalTime >= now && // 시간 역전 방지: 도착시간이 현재시간보다 빠르면 안됨
+        arrivalTime >= now && // 시간 역전 방지
         departTime <= endMin && // endTime 초과 방지
         leg <= maxLegMin
       ) {
-        bestLeg = leg;
-        bestIdx = idx;
+        // 식사 슬롯 점수가 높으면 우선 선택 (거리보다 우선)
+        if (mealSlotScore > 0) {
+          // 식사 슬롯이 채워지지 않았고, 이 POI가 해당 시간대에 맞으면 우선 선택
+          if (mealSlotScore >= 80) {
+            // 식사 슬롯에 정확히 맞는 경우 (100점 또는 80점)
+            if (bestIdx === null || mealSlotScore > (routeArray[bestIdx]?.[1]?.poi ? 
+                (routeArray[bestIdx][1].poi.category === "restaurant" || routeArray[bestIdx][1].poi.categoryType === "restaurant" ? 100 : 0) : 0)) {
+              bestLeg = leg;
+              bestIdx = idx;
+            }
+          } else {
+            // 식사 슬롯 전 시간대 (20점) - 거리도 고려
+            if (bestIdx === null || (mealSlotScore > 0 && leg < bestLeg)) {
+              bestLeg = leg;
+              bestIdx = idx;
+            }
+          }
+        } else {
+          // 식사 슬롯 점수가 없으면 기존처럼 거리 기반 선택
+          if (leg < bestLeg) {
+            bestLeg = leg;
+            bestIdx = idx;
+          }
+        }
       }
     }
 
@@ -476,10 +594,85 @@ export function optimizeRoute(
     waits[bestIdx] = bestLeg;
     stays[bestIdx] = stay;
 
-    now = arrivalTime + stay; // 도착시간 + 체류시간 = 출발시간
+    // 식사 시간대 슬롯 채움 여부 업데이트
+    const selectedPoi = routeArray[bestIdx][1]?.poi;
+    const selectedCategory = selectedPoi?.category || selectedPoi?.categoryType || "";
+    const arrivalTimeForMeal = now + bestLeg;
+    
+    if (mealOptions.lunch && (selectedCategory === "restaurant") && !mealSlotsFilled.lunch) {
+      const lunchWindow = MEAL_WINDOWS.lunch;
+      if (arrivalTimeForMeal >= lunchWindow.start - 30 && arrivalTimeForMeal <= lunchWindow.end + 30) {
+        mealSlotsFilled.lunch = true;
+      }
+    }
+    if (mealOptions.dinner && (selectedCategory === "restaurant") && !mealSlotsFilled.dinner) {
+      const dinnerWindow = MEAL_WINDOWS.dinner;
+      if (arrivalTimeForMeal >= dinnerWindow.start - 30 && arrivalTimeForMeal <= dinnerWindow.end + 30) {
+        mealSlotsFilled.dinner = true;
+      }
+    }
+    if (mealOptions.cafe && (selectedCategory === "cafe") && !mealSlotsFilled.cafe) {
+      const cafeWindow = MEAL_WINDOWS.cafe;
+      if (arrivalTimeForMeal >= cafeWindow.start - 30 && arrivalTimeForMeal <= cafeWindow.end + 30) {
+        mealSlotsFilled.cafe = true;
+      }
+    }
+
+    now = arrivalTimeForMeal + stay; // 도착시간 + 체류시간 = 출발시간
     route.push(bestIdx);
     remaining.delete(bestIdx);
     currentIdx = bestIdx;
+  }
+
+  // B. endTime 활용: 여유 시간이 60분 이상이면 추가 POI 탐색 또는 체류시간 upscaling
+  const remainingTime = endMin - now;
+  if (remainingTime >= 60 && remaining.size === 0) {
+    // 추가 POI 탐색 (이미 선택된 POI 중에서 체류시간을 늘릴 수 있는 것 찾기)
+    let canExtend = false;
+    for (let i = route.length - 1; i > 0; i--) {
+      const idx = route[i];
+      const [__, node] = routeArray[idx];
+      const poi = node?.poi;
+      if (!poi || poi.isRequired) continue; // 필수 방문지는 건드리지 않음
+      
+      const currentStay = stays[idx] || 0;
+      const category = poi.category || poi.categoryType || "spot";
+      const maxStay = getStayTime(category, pace, weights) * 1.5; // 최대 1.5배까지 확장 가능
+      
+      if (currentStay < maxStay) {
+        const additionalStay = Math.min(remainingTime - 30, maxStay - currentStay); // 호텔까지 30분은 남겨두기
+        if (additionalStay > 10) {
+          stays[idx] = currentStay + additionalStay;
+          now += additionalStay;
+          canExtend = true;
+          break;
+        }
+      }
+    }
+    
+    // 체류시간 확장이 안 되면, 남은 시간에 맞는 추가 POI를 다시 탐색
+    if (!canExtend && remainingTime >= 90) {
+      // 남은 시간이 90분 이상이면 한 번 더 POI 탐색 시도
+      const [__, lastNode] = routeArray[currentIdx];
+      for (let i = 1; i < n - 1; i++) {
+        if (route.includes(i)) continue; // 이미 포함된 POI는 제외
+        
+        const [___, cand] = routeArray[i];
+        const leg = travelMinutes(lastNode.lat, lastNode.lon, cand.lat, cand.lon);
+        const poi = cand?.poi || {};
+        const stay = Math.max(10, Math.round(poi.stay_time ?? getStayTime(poi.category || "spot", pace, weights)));
+        
+        if (now + leg + stay + 30 <= endMin && leg <= maxLegMin) {
+          // 호텔까지 30분 여유를 두고 추가 가능
+          waits[i] = leg;
+          stays[i] = stay;
+          route.push(i);
+          now += leg + stay;
+          currentIdx = i;
+          break;
+        }
+      }
+    }
   }
 
   // 6) 호텔(도착지)를 항상 마지막으로 강제 포함

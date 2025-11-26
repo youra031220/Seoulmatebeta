@@ -607,7 +607,8 @@ export default function App() {
       cafe,
       dietPrefs,
       themes,
-      basePOIs
+      basePOIs,
+      requiredStops // 필수 방문지 전달 (중복 방지용)
     );
 
     if (!pois || !pois.length) {
@@ -615,7 +616,7 @@ export default function App() {
       return;
     }
 
-    // ✅ 3) 경로 최적화 (+ 필수 방문지 강제 포함)
+    // ✅ 3) 경로 최적화 (+ 필수 방문지 강제 포함 + 식사 시간대 배치)
     const opt = optimizeRoute(
       pois,
       startPoint,
@@ -624,7 +625,8 @@ export default function App() {
       endMin,
       maxLegNum,
       requiredStops, // 필수 방문지 포함
-      weights || {} // 가중치 (체류시간 계산용)
+      weights || {}, // 가중치 (체류시간 계산용)
+      { breakfast, lunch, dinner, cafe } // 식사 옵션 (시간대 배치용)
     );
 
     // ✅ 4) 시간별 일정 생성
