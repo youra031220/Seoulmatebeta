@@ -83,6 +83,9 @@ export default function App() {
   
   /** 백엔드에서 받은 가중치 (체류시간 계산용) */
   const [weights, setWeights] = useState(null);
+  
+  /** refine API 호출용 상태 */
+  const [refineLoading, setRefineLoading] = useState(false);
 
   
 
@@ -463,6 +466,103 @@ export default function App() {
   const hourToMinutes = (h) => {
     const n = Math.min(24, Math.max(0, Number(h) || 0));
     return n * 60;
+  };
+
+  /**
+   * 앵커 기반 재추천 API 호출 (/api/route/refine)
+   * @param {Object} anchor - { name, lat, lon, category, rating }
+   * @param {Array<string>} dislikedNames - 싫어요 한 장소 이름 목록
+   * @returns {Promise<Array>} 추천된 POI 배열
+   */
+  const fetchRefinedPois = async (anchor, dislikedNames = []) => {
+    if (!anchor || !anchor.lat || !anchor.lon) {
+      console.error("❌ anchor 정보가 없습니다.");
+      return [];
+    }
+
+    setRefineLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/route/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseArea: "서울",
+          message: wishText.trim() || t("wish.placeholder"),
+          context: {
+            breakfast,
+            lunch,
+            dinner,
+            cafe,
+            dietPrefs,
+            waitTolerance,
+            transportMode,
+            maxLeg,
+            numPlaces,
+            startHour,
+            endHour,
+            themes,
+            requiredStops,
+          },
+          anchor: {
+            name: anchor.name,
+            lat: anchor.lat,
+            lon: anchor.lon,
+            category: anchor.category || anchor.categoryType || null,
+            rating: anchor.rating || null,
+          },
+          dislikedNames: dislikedNames || [],
+        }),
+      });
+
+      if (!res.ok) {
+        console.error("❌ /api/route/refine 요청 실패:", res.status);
+        return [];
+      }
+
+      const data = await res.json();
+      const { pois } = data || {};
+
+      // Naver local API raw → routePlanner용 형식으로 변환
+      const converted = (pois || [])
+        .map((p, idx) => {
+          const name = (p.title || "").replace(/<[^>]+>/g, "");
+          const lat = p.mapy ? parseFloat(p.mapy) / 1e7 : null;
+          const lon = p.mapx ? parseFloat(p.mapx) / 1e7 : null;
+          if (!lat || !lon) return null;
+
+          const categoryType = p.categoryType || "poi";
+          const isFood =
+            categoryType === "restaurant" ||
+            categoryType === "cafe" ||
+            /카페|cafe|커피|디저트|음식점|식당|맛집|레스토랑/i.test(
+              p.category || ""
+            );
+
+          return {
+            id: `refine_${idx}_${Date.now()}`,
+            name,
+            address: p.roadAddress || p.address,
+            lat,
+            lon,
+            category: p.category || "기타",
+            rating: p.rating ? Number(p.rating) : 4.0,
+            stay_time: 60,
+            diet_tags: [],
+            categoryType,
+            isFood,
+            _raw: p,
+            _isRefined: true, // refine으로 추가된 POI 표시
+          };
+        })
+        .filter(Boolean);
+
+      return converted;
+    } catch (err) {
+      console.error("❌ fetchRefinedPois 에러:", err);
+      return [];
+    } finally {
+      setRefineLoading(false);
+    }
   };
 
   /** 🍀 여행 계획 생성 */

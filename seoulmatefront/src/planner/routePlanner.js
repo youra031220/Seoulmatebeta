@@ -483,11 +483,11 @@ export function optimizeRoute(
   }
 
   // 6) 호텔(도착지)를 항상 마지막으로 강제 포함
-  // 시간 제약이 있어도 호텔은 반드시 포함되도록, 필요시 중간 POI를 제거
+  // Hard Constraint: 시간 제약이 있어도 호텔은 반드시 포함
   if (currentIdx !== n - 1) {
     const [__, lastNode] = routeArray[currentIdx];
     const [___, endNode2] = routeArray[n - 1];
-    const legToEnd = travelMinutes(
+    let legToEnd = travelMinutes(
       lastNode.lat,
       lastNode.lon,
       endNode2.lat,
@@ -495,38 +495,41 @@ export function optimizeRoute(
     );
 
     // 호텔까지 이동시간이 endTime을 초과하면, 중간 POI를 제거하여 시간 확보
-    if (now + legToEnd > endMin) {
-      // 마지막 POI부터 역순으로 제거하여 호텔 도착 시간 확보
-      while (route.length > 1 && now + legToEnd > endMin) {
-        const removedIdx = route.pop();
-        if (removedIdx === 0 || removedIdx === n - 1) break; // start/end는 제거 불가
-        now -= (waits[removedIdx] || 0) + (stays[removedIdx] || 0);
-        currentIdx = route[route.length - 1];
-        const [____, prevNode] = routeArray[currentIdx];
-        const recalcLeg = travelMinutes(
-          prevNode.lat,
-          prevNode.lon,
-          endNode2.lat,
-          endNode2.lon
-        );
-        if (now + recalcLeg <= endMin && recalcLeg <= maxLegMin) {
-          break;
-        }
+    while (now + legToEnd > endMin && route.length > 1) {
+      const removedIdx = route.pop();
+      if (removedIdx === 0 || removedIdx === n - 1) {
+        // start/end는 제거 불가, 강제로 호텔 추가
+        break;
       }
+      // 제거된 POI의 시간을 빼기
+      now -= (waits[removedIdx] || 0) + (stays[removedIdx] || 0);
+      currentIdx = route[route.length - 1];
+      const [____, prevNode] = routeArray[currentIdx];
+      // 호텔까지 거리 재계산
+      legToEnd = travelMinutes(
+        prevNode.lat,
+        prevNode.lon,
+        endNode2.lat,
+        endNode2.lon
+      );
     }
 
-    // 호텔 도착이 가능한 경우에만 추가
-    const finalLegToEnd = travelMinutes(
-      routeArray[route[route.length - 1]][1].lat,
-      routeArray[route[route.length - 1]][1].lon,
-      endNode2.lat,
-      endNode2.lon
-    );
-    
-    if (now + finalLegToEnd <= endMin && finalLegToEnd <= maxLegMin) {
-      waits[n - 1] = finalLegToEnd;
+    // 호텔은 무조건 추가 (시간 초과해도 경고만)
+    if (legToEnd <= maxLegMin) {
+      waits[n - 1] = legToEnd;
       stays[n - 1] = 0;
       route.push(n - 1);
+      
+      // endTime 초과 시 경고 (하지만 포함은 함)
+      if (now + legToEnd > endMin) {
+        console.warn(`⚠️ 호텔 도착 예상 시간이 종료 시간을 ${now + legToEnd - endMin}분 초과합니다.`);
+      }
+    } else {
+      // maxLegMin 초과 시에도 호텔은 포함 (이동시간이 길어도)
+      waits[n - 1] = legToEnd;
+      stays[n - 1] = 0;
+      route.push(n - 1);
+      console.warn(`⚠️ 호텔까지 이동시간(${legToEnd}분)이 최대 구간 제한(${maxLegMin}분)을 초과합니다.`);
     }
   }
 
@@ -570,7 +573,13 @@ export function generateSchedule(
     
     // 시간 역전 방지: 도착시간이 이전 출발시간보다 빠르면 안됨
     const arrivalTime = Math.max(prevDepart, now + wait);
-    now = arrivalTime;
+    if (arrivalTime < prevDepart) {
+      console.error(`❌ 시간 역전 발생: arrival(${arrivalTime}) < prevDepart(${prevDepart})`);
+      // 강제로 이전 출발시간 이후로 설정
+      now = prevDepart;
+    } else {
+      now = arrivalTime;
+    }
     const arrival = toHM(now);
 
     const stay = stays[idx] || 0;
@@ -601,7 +610,12 @@ export function generateSchedule(
         stay: adjustedStay,
         rating,
       });
-      break; // endTime 초과 시 이후 일정 중단
+      
+      // end 타입이 아니면 중단, end 타입이면 포함 후 종료
+      if (type !== "end") {
+        break;
+      }
+      return rows;
     }
     
     now = departTime;
@@ -628,7 +642,20 @@ export function generateSchedule(
       rating,
     });
 
-    if (now >= endMin) break;
+    // end 타입이면 반드시 마지막이어야 함
+    if (type === "end") {
+      break;
+    }
+  }
+
+  // 검증: 마지막 항목이 end인지 확인
+  if (rows.length > 0) {
+    const lastRow = rows[rows.length - 1];
+    const lastIdx = route[route.length - 1];
+    const [lastType] = routeArray[lastIdx];
+    if (lastType !== "end") {
+      console.warn("⚠️ 일정의 마지막 항목이 호텔(도착지)이 아닙니다.");
+    }
   }
 
   return rows;

@@ -792,7 +792,13 @@ app.post("/api/route/refine", async (req, res) => {
 
     // 7) 기준 anchor 주변 / 취향 기반 점수 계산
     const anchorPoint = { lat: anchor.lat, lng: anchor.lon };
-    const scoredPOIs = scorePOIs(pois, safePrefs, weights, anchorPoint);
+    const anchorForScoring = {
+      lat: anchor.lat,
+      lon: anchor.lon,
+      category: anchor.category || anchor.categoryType || null,
+      rating: anchor.rating || null,
+    };
+    const scoredPOIs = scorePOIs(pois, safePrefs, weights, anchorPoint, anchorForScoring);
 
     // 8) 상위 N개만 반환 (너무 많지 않게)
     const TOP_N = 20;
