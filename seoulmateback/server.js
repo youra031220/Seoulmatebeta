@@ -723,6 +723,9 @@ app.post("/api/search-with-pref", async (req, res) => {
     // 6) 최종 결과에 categoryType 태그 붙여서 반환
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 
@@ -912,6 +915,9 @@ app.post("/api/route/refine", async (req, res) => {
 
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 

@@ -16,38 +16,53 @@ export default function App() {
   const { t, i18n } = useTranslation();
   const currentLang = i18n.language || "ko";   // 🔹 이 줄만 추가
 
-  // 🔹 번역 + 한국어 표기용 헬퍼 (App 컴포넌트 안에!)
-  const formatPlaceName = (poi) => {
-    if (!poi) return "";
+  // 🔹 모든 장소 공통: "영문이름 (한국어 이름)" 형식으로 출력
+  const formatPlaceName = (row) => {
+    if (!row) return "";
 
-    const ko = poi.nameKo || poi.name || "";
-    const tr = poi.nameTranslated || "";
+    // 기본 이름(현재 언어 기준)과 한국어 이름을 분리해서 가져오기
+    const base =
+      row.nameTranslated      // Gemini 번역 이름(영어 UI면 보통 영어)
+      || row.name             // 서버에서 온 기본 이름
+      || "";
 
-    // 한국어 UI면 그냥 한글만
+    const ko = row.nameKo || "";  // 한국어 이름(없으면 "")
+
+    // 1) 한국어 UI일 때는 한국어만 보이게 (필요하면 이 부분도 병기로 바꿀 수 있음)
     if (currentLang === "ko") {
-      return ko;
+      // 한국어가 있으면 한국어, 없으면 base
+      return ko || base;
     }
 
-    // 번역이 없거나, 번역이랑 한글이 같으면 한글만
-    if (!tr || tr === ko) {
-      return ko;
+    // 2) 둘 중 하나만 있거나, 둘이 같으면 하나만 출력
+    if (!base && !ko) return "";
+    if (!ko || ko === base) {
+      return base || ko;
     }
 
-    // 예: "Gyeongbokgung Palace (경복궁)"
-    return `${tr} (${ko})`;
+    // 3) 영어 UI(또는 기타 언어)에서는
+    //    "영문이름 (한국어 이름)" 형식으로 출력
+    //    예: "Gyeongbokgung Palace (경복궁)"
+    return `${base} (${ko})`;
   };
 
-  const formatCategory = (poiCategoryTranslated, poiCategoryKo) => {
-    const ko = poiCategoryKo || poiCategoryTranslated || "";
-    const tr = poiCategoryTranslated || "";
+  const formatCategory = (row) => {
+    if (!row) return "";
 
-    if (currentLang === "ko") return ko;
-    if (!tr || tr === ko) return ko;
+    const raw = row.category || "";
 
-    // 번역만 보여주고 싶으면 `return tr;`
-    // 번역 + 한글 같이 보고 싶으면:
-    return `${tr} / ${ko}`;
+    // 1) 출발 / 도착 / 필수 방문지 → i18n 키로 번역 (영어만)
+    if (raw === "출발") return t("schedule.category.start");   // 예: "Start"
+    if (raw === "도착") return t("schedule.category.end");     // 예: "End"
+    if (raw === "required") return t("schedule.category.required"); // 예: "Required stop"
+
+    // 2) 그 외 일반 카테고리: 영어 한 줄만 보이도록
+    const tr = row.categoryTranslated || raw;
+
+    // UI 언어와 상관없이 카테고리는 영어 한 줄만 사용
+    return tr;
   };
+
 
   /** 출발 / 도착 */
   const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
@@ -502,7 +517,6 @@ export default function App() {
       const converted =
   (pois || [])
     .map((p, idx) => {
-
       // 원본 한글 이름 (HTML 태그 제거)
       const originalName = String(p.title || p.name || "")
         .replace(/<[^>]+>/g, "")
@@ -512,7 +526,7 @@ export default function App() {
       const translatedName = String(p.titleTranslated || "")
         .replace(/<[^>]+>/g, "")
         .trim();
-      
+
       const lat = p.mapy ? parseFloat(p.mapy) / 1e7 : null;
       const lon = p.mapx ? parseFloat(p.mapx) / 1e7 : null;
       if (!lat || !lon) return null;
@@ -520,6 +534,7 @@ export default function App() {
       const originalCategory = String(p.category || p.categoryType || "").trim();
       const translatedCategory = String(p.categoryTranslated || "").trim();
 
+      // 카테고리 타입 / 음식 여부
       const categoryType = p.categoryType || "poi";
       const isFood =
         categoryType === "restaurant" ||
@@ -538,6 +553,7 @@ export default function App() {
         address: p.roadAddress || p.address,
         lat,
         lon,
+        // 🔹 카테고리도 한글/번역/기본 모두 저장
         categoryKo: originalCategory,
         categoryTranslated: translatedCategory,
         category: translatedCategory || originalCategory,
@@ -730,7 +746,7 @@ export default function App() {
       { breakfast, lunch, dinner, cafe } // 식사 옵션 (시간대 배치용)
     );
 
-    // ✅ 4) 시간별 일정 생성
+    // ✅ 4) 시간별 일정 생성 (출발/도착을 객체로 전달)
     const schedule = generateSchedule(
       opt.routeArray,
       opt.route,
@@ -738,8 +754,16 @@ export default function App() {
       opt.stays,
       startMin,
       endMin,
-      startPoint.name,
-      endPoint.name
+      {
+        name: startPoint?.name,
+        nameKo: startPoint?.nameKo ?? startPoint?.name,
+        nameTranslated: startPoint?.nameTranslated ?? "",
+      },
+      {
+        name: endPoint?.name,
+        nameKo: endPoint?.nameKo ?? endPoint?.name,
+        nameTranslated: endPoint?.nameTranslated ?? "",
+      }
     );
 
     setPlan({ ...opt, schedule });
@@ -1615,22 +1639,84 @@ const handleSendWish = async () => {
 
                     {/* 🔹 장소명: 번역 + (한국어) */}
                     <td style={{ padding: "4px 0" }}>
-                      {currentLang === "ko"
-                        ? (r.nameKo || r.name) // 한국어 UI면 그냥 한글만
-                        : r.nameTranslated && r.nameTranslated !== (r.nameKo || r.name)
-                        ? `${r.nameTranslated} (${r.nameKo || r.name})` // 예: Gyeongbokgung Palace (경복궁)
-                        : (r.nameKo || r.name)}
+                      {formatPlaceName(r)}
                     </td>
 
-                    {/* 🔹 카테고리: 번역 + / + 한국어 */}
+                    {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
                     <td style={{ padding: "4px 0" }}>
-                      {currentLang === "ko"
-                        ? (r.categoryKo || r.category)
-                        : r.categoryTranslated &&
-                          r.categoryTranslated !== (r.categoryKo || r.category)
-                        ? `${r.categoryTranslated} / ${r.categoryKo || r.category}`
-                        : (r.categoryKo || r.category)}
+                      {(() => {
+                        const raw = r.category || "";                // 원본 카테고리 (예: "출발", "도착", "required", 그 외…)
+                        const ko = r.categoryKo || raw;             // 한국어 카테고리
+                        const tr = r.categoryTranslated || "";      // 번역된 카테고리 (Gemini에서 온 값)
+
+                        // 🔹 1) 출발 / 도착 / 필수 방문지 → 언어별 고정 번역
+                        const translateSpecialCategory = () => {
+                          // 출발
+                          if (raw === "출발") {
+                            switch (currentLang) {
+                              case "ko":   return "출발";
+                              case "en":   return "Start";
+                              case "ja":   return "出発";
+                              case "zh-CN":return "出发";
+                              case "zh-TW":return "出發";
+                              case "vi":   return "Khởi hành";
+                              case "th":   return "ออกเดินทาง";
+                              case "id":   return "Mulai";
+                              case "es":   return "Salida";
+                              case "de":   return "Start";
+                              default:     return ko;
+                            }
+                          }
+
+                          // 도착
+                          if (raw === "도착") {
+                            switch (currentLang) {
+                              case "ko":   return "도착";
+                              case "en":   return "End";
+                              case "ja":   return "到着";
+                              case "zh-CN":return "到达";
+                              case "zh-TW":return "抵達";
+                              case "vi":   return "Kết thúc";
+                              case "th":   return "สิ้นสุด";
+                              case "id":   return "Selesai";
+                              case "es":   return "Llegada";
+                              case "de":   return "Ziel";
+                              default:     return ko;
+                            }
+                          }
+
+                          // 필수 방문지 (required)
+                          if (raw === "required") {
+                            switch (currentLang) {
+                              case "ko":   return "필수 방문지";
+                              case "en":   return "Required stop";
+                              case "ja":   return "必須スポット";
+                              case "zh-CN":return "必去景点";
+                              case "zh-TW":return "必去景點";
+                              case "vi":   return "Điểm bắt buộc";
+                              case "th":   return "จุดที่ต้องไป";
+                              case "id":   return "Tempat wajib";
+                              case "es":   return "Parada obligatoria";
+                              case "de":   return "Pflichtstopp";
+                              default:     return ko;
+                            }
+                          }
+
+                          return null; // 특별 카테고리 아님
+                        };
+
+                        const special = translateSpecialCategory();
+                        if (special) return special;   // 출발/도착/필수면 여기서 끝
+
+                        // 🔹 2) 그 외 일반 카테고리 (맛집/카페/쇼핑…) 처리
+                        if (currentLang === "ko") return ko;
+                        if (!tr || tr === ko) return ko;
+
+                        // 예: "Buffet > Vegetarian / 뷔페>채식뷔페"
+                        return `${tr}`;
+                      })()}
                     </td>
+
 
                     <td style={{ padding: "4px 0" }}>{r.arrival}</td>
                     <td style={{ padding: "4px 0" }}>{r.depart}</td>
@@ -1655,9 +1741,72 @@ const handleSendWish = async () => {
                 {plan.schedule.map((r) => (
                   <li key={r.order} style={{ marginBottom: 6 }}>
                     <b>
-                      {r.order}. {r.name}
+                      {r.order}. {formatPlaceName(r)}
                     </b>{" "}
-                    — {r.category} / {r.arrival} ~ {r.depart}
+                    —{" "}
+                    {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
+                    {(() => {
+                      const raw = r.category || "";           // 원본 카테고리 (출발/도착/required/기타)
+                      const ko = r.categoryKo || raw;        // 한국어 카테고리
+                      const tr = r.categoryTranslated || ""; // 번역된 카테고리 (Gemini 결과)
+
+                      // 1) 출발 / 도착 / 필수 방문지 → 언어별 고정 번역
+                      if (raw === "출발") {
+                        switch (currentLang) {
+                          case "ko":   return "출발";
+                          case "en":   return "Start";
+                          case "ja":   return "出発";
+                          case "zh-CN":return "出发";
+                          case "zh-TW":return "出發";
+                          case "vi":   return "Khởi hành";
+                          case "th":   return "ออกเดินทาง";
+                          case "id":   return "Mulai";
+                          case "es":   return "Salida";
+                          case "de":   return "Start";
+                          default:     return ko;
+                        }
+                      }
+
+                      if (raw === "도착") {
+                        switch (currentLang) {
+                          case "ko":   return "도착";
+                          case "en":   return "End";
+                          case "ja":   return "到着";
+                          case "zh-CN":return "到达";
+                          case "zh-TW":return "抵達";
+                          case "vi":   return "Kết thúc";
+                          case "th":   return "สิ้นสุด";
+                          case "id":   return "Selesai";
+                          case "es":   return "Llegada";
+                          case "de":   return "Ziel";
+                          default:     return ko;
+                        }
+                      }
+
+                      if (raw === "required") {
+                        switch (currentLang) {
+                          case "ko":   return "필수 방문지";
+                          case "en":   return "Required stop";
+                          case "ja":   return "必須スポット";
+                          case "zh-CN":return "必去景点";
+                          case "zh-TW":return "必去景點";
+                          case "vi":   return "Điểm bắt buộc";
+                          case "th":   return "จุดที่ต้องไป";
+                          case "id":   return "Tempat wajib";
+                          case "es":   return "Parada obligatoria";
+                          case "de":   return "Pflichtstopp";
+                          default:     return ko;
+                        }
+                      }
+
+                      // 2) 일반 카테고리 (맛집/카페/쇼핑 등)
+                      if (currentLang === "ko") return ko;
+                      if (!tr || tr === ko) return ko;
+
+                      return `${tr}`; // 예: "Buffet / 뷔페"
+                    })()}
+                    {" "}
+                    / {r.arrival} ~ {r.depart}
                   </li>
                 ))}
               </ul>
