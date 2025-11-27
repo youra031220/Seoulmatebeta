@@ -3,6 +3,7 @@ import {
   toMinutes,
   toTimeString,
 } from "../utils/timeConstants.js";
+import { useTranslation } from "react-i18next";
 
 /* ===================== 샘플 POI/기본 위치 ===================== */
 /**
@@ -930,7 +931,11 @@ export function generateSchedule(
       rows.push({
         order: i + 1,
         name,
+        nameKo: poi?.nameKo ?? poi?.name ?? "",
+        nameTranslated: poi?.nameTranslated ?? "",
         category,
+        categoryKo: poi?.categoryKo ?? poi?.category ?? "",
+        categoryTranslated: poi?.categoryTranslated ?? "",
         arrival,
         depart,
         wait,
@@ -961,7 +966,11 @@ export function generateSchedule(
     rows.push({
       order: i + 1,
       name,
+      nameKo: poi?.nameKo ?? poi?.name ?? "",
+      nameTranslated: poi?.nameTranslated ?? "",
       category,
+      categoryKo: poi?.categoryKo ?? poi?.category ?? "",
+      categoryTranslated: poi?.categoryTranslated ?? "",
       arrival,
       depart,
       wait,

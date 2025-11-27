@@ -12,7 +12,42 @@ import Header from "./components/Header/Header";
 import "./App.css";
 
 export default function App() {
-  const { t } = useTranslation();
+
+  const { t, i18n } = useTranslation();
+  const currentLang = i18n.language || "ko";   // 🔹 이 줄만 추가
+
+  // 🔹 번역 + 한국어 표기용 헬퍼 (App 컴포넌트 안에!)
+  const formatPlaceName = (poi) => {
+    if (!poi) return "";
+
+    const ko = poi.nameKo || poi.name || "";
+    const tr = poi.nameTranslated || "";
+
+    // 한국어 UI면 그냥 한글만
+    if (currentLang === "ko") {
+      return ko;
+    }
+
+    // 번역이 없거나, 번역이랑 한글이 같으면 한글만
+    if (!tr || tr === ko) {
+      return ko;
+    }
+
+    // 예: "Gyeongbokgung Palace (경복궁)"
+    return `${tr} (${ko})`;
+  };
+
+  const formatCategory = (poiCategoryTranslated, poiCategoryKo) => {
+    const ko = poiCategoryKo || poiCategoryTranslated || "";
+    const tr = poiCategoryTranslated || "";
+
+    if (currentLang === "ko") return ko;
+    if (!tr || tr === ko) return ko;
+
+    // 번역만 보여주고 싶으면 `return tr;`
+    // 번역 + 한글 같이 보고 싶으면:
+    return `${tr} / ${ko}`;
+  };
 
   /** 출발 / 도착 */
   const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
@@ -414,6 +449,8 @@ export default function App() {
         body: JSON.stringify({
           baseArea: "서울",
           message: travelMessage,
+          lang: i18n.language,   // 🔹 ko / en / ja
+
           context: {
             breakfast,
             lunch,
@@ -465,12 +502,25 @@ export default function App() {
       const converted =
   (pois || [])
     .map((p, idx) => {
-      const name = (p.title || "").replace(/<[^>]+>/g, "");
+
+      // 원본 한글 이름 (HTML 태그 제거)
+      const originalName = String(p.title || p.name || "")
+        .replace(/<[^>]+>/g, "")
+        .trim();
+
+      // 번역된 이름 (백엔드가 붙여준 필드, 없으면 빈 문자열)
+      const translatedName = String(p.titleTranslated || "")
+        .replace(/<[^>]+>/g, "")
+        .trim();
+      
       const lat = p.mapy ? parseFloat(p.mapy) / 1e7 : null;
       const lon = p.mapx ? parseFloat(p.mapx) / 1e7 : null;
       if (!lat || !lon) return null;
 
-      const categoryType = p.categoryType || "poi"; // 서버에서 붙여준 태그
+      const originalCategory = String(p.category || p.categoryType || "").trim();
+      const translatedCategory = String(p.categoryTranslated || "").trim();
+
+      const categoryType = p.categoryType || "poi";
       const isFood =
         categoryType === "restaurant" ||
         categoryType === "cafe" ||
@@ -480,11 +530,17 @@ export default function App() {
 
       return {
         id: idx,
-        name,
+        // 🔹 이름은 일단 둘 다 저장해 둔다
+        nameKo: originalName,
+        nameTranslated: translatedName,
+        // 기본 name은 번역 우선, 없으면 한글
+        name: translatedName || originalName,
         address: p.roadAddress || p.address,
         lat,
         lon,
-        category: p.category || "기타",
+        categoryKo: originalCategory,
+        categoryTranslated: translatedCategory,
+        category: translatedCategory || originalCategory,
         rating: p.rating ? Number(p.rating) : 4.0,
         stay_time: 60,
         diet_tags: [],
@@ -1556,13 +1612,31 @@ const handleSendWish = async () => {
                   {plan.schedule.map((r) => (
                     <tr key={r.order}>
                       <td style={{ padding: "4px 0" }}>{r.order}</td>
-                      <td style={{ padding: "4px 0" }}>{r.name}</td>
-                      <td style={{ padding: "4px 0" }}>{r.category}</td>
-                      <td style={{ padding: "4px 0" }}>{r.arrival}</td>
-                      <td style={{ padding: "4px 0" }}>{r.depart}</td>
-                    </tr>
-                  ))}
-                </tbody>
+
+                    {/* 🔹 장소명: 번역 + (한국어) */}
+                    <td style={{ padding: "4px 0" }}>
+                      {currentLang === "ko"
+                        ? (r.nameKo || r.name) // 한국어 UI면 그냥 한글만
+                        : r.nameTranslated && r.nameTranslated !== (r.nameKo || r.name)
+                        ? `${r.nameTranslated} (${r.nameKo || r.name})` // 예: Gyeongbokgung Palace (경복궁)
+                        : (r.nameKo || r.name)}
+                    </td>
+
+                    {/* 🔹 카테고리: 번역 + / + 한국어 */}
+                    <td style={{ padding: "4px 0" }}>
+                      {currentLang === "ko"
+                        ? (r.categoryKo || r.category)
+                        : r.categoryTranslated &&
+                          r.categoryTranslated !== (r.categoryKo || r.category)
+                        ? `${r.categoryTranslated} / ${r.categoryKo || r.category}`
+                        : (r.categoryKo || r.category)}
+                    </td>
+
+                    <td style={{ padding: "4px 0" }}>{r.arrival}</td>
+                    <td style={{ padding: "4px 0" }}>{r.depart}</td>
+                  </tr>
+                ))}
+              </tbody>
               </table>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
