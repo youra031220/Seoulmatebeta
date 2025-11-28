@@ -4,6 +4,7 @@ import {
   selectPOIs,
   optimizeRoute,
   generateSchedule,
+  getPlaceLangFlags, // 새로 추가
 } from "./planner/routePlanner";
 
 import LocationSearch from "./components/LocationSearch/LocationSearch";
@@ -12,7 +13,19 @@ import Header from "./components/Header/Header";
 import "./App.css";
 
 export default function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  const getActiveLangCodes = () => {
+    const lang = i18n.language || "ko";
+  
+    if (lang.startsWith("en")) return ["en"];
+    if (lang.startsWith("ja")) return ["ja"];
+    if (lang.startsWith("zh")) return ["zh"]; // zh-CN / zh-TW 모두 포함
+  
+    // ko, vi, th, id, es, de 등은 "선호언어 DB"에 없으므로 국기 표시 없음
+    return [];
+  };
+  
 
   /** 출발 / 도착 */
   const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
@@ -408,7 +421,7 @@ export default function App() {
         : t("wish.placeholder");
 
     try {
-      const res = await fetch("http://localhost:5000/api/search-with-pref", {
+      const res = await fetch("http://localhost:5001/api/search-with-pref", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -526,7 +539,7 @@ export default function App() {
 
     setRefineLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/route/refine", {
+      const res = await fetch("http://localhost:5001/api/route/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -713,7 +726,7 @@ const handleSendWish = async () => {
   setWishText("");
 
   try {
-    const res = await fetch("http://localhost:5000/api/travel-wish", {
+    const res = await fetch("http://localhost:5001/api/travel-wish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1553,16 +1566,36 @@ const handleSendWish = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {plan.schedule.map((r) => (
-                    <tr key={r.order}>
-                      <td style={{ padding: "4px 0" }}>{r.order}</td>
-                      <td style={{ padding: "4px 0" }}>{r.name}</td>
-                      <td style={{ padding: "4px 0" }}>{r.category}</td>
-                      <td style={{ padding: "4px 0" }}>{r.arrival}</td>
-                      <td style={{ padding: "4px 0" }}>{r.depart}</td>
-                    </tr>
-                  ))}
-                </tbody>
+  {plan.schedule.map((r) => {
+    const flags = getPlaceLangFlags(r.name,getActiveLangCodes());
+
+    return (
+      <tr key={r.order}>
+        <td style={{ padding: "4px 0" }}>{r.order}</td>
+        <td style={{ padding: "4px 0" }}>
+          {r.name}
+          {flags.length > 0 && (
+            <span style={{ marginLeft: 6 }}>
+              {flags.map((info) => (
+                <span
+                  key={info.code}
+                  title={info.label}
+                  style={{ marginRight: 4 }}
+                >
+                  {info.flag}
+                </span>
+              ))}
+            </span>
+          )}
+        </td>
+        <td style={{ padding: "4px 0" }}>{r.category}</td>
+        <td style={{ padding: "4px 0" }}>{r.arrival}</td>
+        <td style={{ padding: "4px 0" }}>{r.depart}</td>
+      </tr>
+    );
+  })}
+</tbody>
+
               </table>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
@@ -1578,15 +1611,33 @@ const handleSendWish = async () => {
             </h3>
             {plan?.schedule?.length ? (
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
-                {plan.schedule.map((r) => (
+              {plan.schedule.map((r) => {
+                const flags = getPlaceLangFlags(r.name, getActiveLangCodes());
+            
+                return (
                   <li key={r.order} style={{ marginBottom: 6 }}>
                     <b>
                       {r.order}. {r.name}
+                      {flags.length > 0 && (
+                        <span style={{ marginLeft: 6 }}>
+                          {flags.map((info) => (
+                            <span
+                              key={info.code}
+                              title={info.label}
+                              style={{ marginRight: 4 }}
+                            >
+                              {info.flag}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </b>{" "}
                     — {r.category} / {r.arrival} ~ {r.depart}
                   </li>
-                ))}
-              </ul>
+                );
+              })}
+            </ul>
+            
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {t("specifics.none")}

@@ -60,6 +60,155 @@ export const ALL_POIS = [
   },
 ];
 
+/* ===================== 다국어 선호 장소 + 국기 정보 ===================== */
+
+// 언어 코드별 국기/라벨
+const LANGUAGE_FLAGS = {
+  en: { code: "en", label: "English user favorite", flag: "🇺🇸" }, // 필요하면 🇬🇧 등으로 변경
+  zh: { code: "zh", label: "중국어 사용자 선호",      flag: "🇨🇳" },
+  ja: { code: "ja", label: "일본어 사용자 선호",      flag: "🇯🇵" },
+};
+
+// 장소 이름을 매칭하기 위한 간단한 정규화
+function normalizePlaceName(name = "") {
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ""); // 공백 제거
+}
+
+/**
+ * 언어별 선호 장소 샘플
+ * - key: 언어 코드(en/zh/ja)
+ * - value: normalizePlaceName() 된 장소 이름의 Set
+ *
+ * 지금은 ALL_POIS 안에 있는 영어 이름 기준으로만 넣어둘게요.
+ * (실제 서비스에서는 각 언어별 실제 이름이나 placeId 기반으로 바꿔도 됨)
+ */
+const PREFERRED_PLACES_BY_LANG = {
+  en: new Set([
+    normalizePlaceName("경복궁"),
+    normalizePlaceName("북촌 한옥마을"),
+    normalizePlaceName("인사동문화의거리"),
+    normalizePlaceName("YTN서울타워"),
+    normalizePlaceName("신세계백화점 본점 더 리저브"),
+    normalizePlaceName("홍대걷고싶은거리"),
+    normalizePlaceName("강남역 2호선"),
+    normalizePlaceName("코엑스"),
+    normalizePlaceName("별마당 도서관"),
+    normalizePlaceName("롯데월드타워"),
+    normalizePlaceName("동대문디자인플라자"),
+    normalizePlaceName("서울숲"),
+    normalizePlaceName("여의도 한강공원"),
+    normalizePlaceName("익선동한옥거리"),
+    normalizePlaceName("롯데월드 아쿠아리움"),
+    normalizePlaceName("커먼그라운드"),
+    normalizePlaceName("현대백화점 더현대 서울"),
+    normalizePlaceName("리움미술관"),
+    normalizePlaceName("국립중앙박물관"),
+    normalizePlaceName("삼청동문화거리"),
+    normalizePlaceName("청계천"),
+    normalizePlaceName("압구정로데오거리"),
+    normalizePlaceName("봉은사"),
+    normalizePlaceName("이태원역 6호선"),
+    normalizePlaceName("서울광장"),
+    normalizePlaceName("광장시장"),
+    normalizePlaceName("남대문시장"),
+    normalizePlaceName("블루보틀 성수 카페"),
+    normalizePlaceName("성수동카페거리"),
+    normalizePlaceName("광화문"), //30
+  ]),
+  zh: new Set([
+    normalizePlaceName("경복궁"),
+    normalizePlaceName("창덕궁"),
+    normalizePlaceName("북촌 한옥마을"),
+    normalizePlaceName("창경궁"),
+    normalizePlaceName("롯데면세점 명동본점"),
+    normalizePlaceName("롯데월드타워"),
+    normalizePlaceName("롯데월드 어드벤처"),
+    normalizePlaceName("코엑스"),
+    normalizePlaceName("현대백화점 더현대 서울"),
+    normalizePlaceName("남대문시장"),
+    normalizePlaceName("동대문종합시장"),
+    normalizePlaceName("성수동카페거리"),
+    normalizePlaceName("광장시장"),
+    normalizePlaceName("천주교 서울대교구 주교좌명동대성당"),
+    normalizePlaceName("압구정로데오거리"),
+    normalizePlaceName("가로수길"),
+    normalizePlaceName("서울숲"),
+    normalizePlaceName("카페 오쁘띠베르"),
+    normalizePlaceName("스타필드 하남"),
+    normalizePlaceName("여의도 한강공원"),
+    normalizePlaceName("YTN서울타워"),
+    normalizePlaceName("동대문디자인플라자"),
+    normalizePlaceName("에버랜드"),
+    normalizePlaceName("교보문고 광화문점"),
+    normalizePlaceName("광화문"),
+    normalizePlaceName("쌈지길"),
+    normalizePlaceName("롯데마트 제타플렉스 서울역점"),
+    normalizePlaceName("올리브영 명동 타운점"),
+    normalizePlaceName("아모레 성수"),
+    normalizePlaceName("무신사 스탠다드 명동점"), // 30
+  ]),
+  ja: new Set([
+    normalizePlaceName("홍대걷고싶은거리"),
+    normalizePlaceName("경복궁"),
+    normalizePlaceName("창덕궁"),
+    normalizePlaceName("북촌 한옥마을"),
+    normalizePlaceName("망원시장"),
+    normalizePlaceName("성수동카페거리"),
+    normalizePlaceName("아디다스 오리지널스 플래그십 성수"),
+    normalizePlaceName("광장시장"),
+    normalizePlaceName("서울숲"),
+    normalizePlaceName("SM엔터테인먼트"),
+    normalizePlaceName("YTN서울타워"),
+    normalizePlaceName("동대문디자인플라자"),
+    normalizePlaceName("스타필드 하남"),
+    normalizePlaceName("압구정로데오거리"),
+    normalizePlaceName("여의도 한강공원"),
+    normalizePlaceName("익선동한옥거리"),
+    normalizePlaceName("가로수길"),
+    normalizePlaceName("롯데월드타워"),
+    normalizePlaceName("별마당 도서관"),
+    normalizePlaceName("교보문고 광화문점"), // 20
+    normalizePlaceName("아모레 성수"),
+    normalizePlaceName("국립중앙박물관"),
+    normalizePlaceName("리움미술관"),
+    normalizePlaceName("어니언 성수"),
+    normalizePlaceName("기미사 성수"),
+    normalizePlaceName("현대백화점 신촌점"),
+    normalizePlaceName("이화마을"),
+    normalizePlaceName("디뮤지엄"),
+    normalizePlaceName("아모레퍼시픽미술관"),
+    normalizePlaceName("스타필드 고양"), //30
+  ]),
+};
+
+/**
+ * 특정 장소 이름이 어떤 언어 사용자에게 인기인지 조회
+ * @param {string} placeName - 일정에 표시되는 장소 이름 (generateSchedule에서 만들어지는 name)
+ * @returns {Array<{code: string, label: string, flag: string}>}
+ */
+export function getPlaceLangFlags(placeName, activeLangs=[]) {
+  if (!placeName) return [];
+
+  const normalized = normalizePlaceName(placeName);
+  const isFilterMode = activeLangs.length > 0;
+  const result = [];
+
+  for (const [lang, set] of Object.entries(PREFERRED_PLACES_BY_LANG)) {
+    if (set.has(normalized)) {
+      // 사용자가 선택한 언어(activeLangs)가 있을 때만 필터 적용
+      if (!isFilterMode || activeLangs.includes(lang)) {
+        result.push(LANGUAGE_FLAGS[lang]);
+      }
+    }
+  }
+
+  return result;
+}
+
+
 /* ===================== 공통 유틸 함수 ===================== */
 
 // Category diversity limit
