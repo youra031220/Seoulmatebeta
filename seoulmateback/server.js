@@ -111,7 +111,7 @@ async function analyzeTravelPreference(message, context = {}, requiredStopNames 
     throw new Error("Gemini 클라이언트가 초기화되지 않았습니다.");
   }
 
-  const modelName = "gemini-2.0-flash";
+  const modelName = "gemini-2.5-flash";
 
   const aiModel = genAIClient.getGenerativeModel({
     model: modelName,
@@ -235,8 +235,8 @@ ${JSON.stringify(context, null, 2)}
 const GENERIC_KEYWORDS = new Set(["맛집", "카페", "명소", "관광지", "데이트", "핫플레이스"]);
 
 // Poi/Food 쿼리 개수 상한 (Rate limit 방지용)
-const MAX_POI_QUERIES = 6;
-const MAX_FOOD_QUERIES = 6;
+const MAX_POI_QUERIES = 15;
+const MAX_FOOD_QUERIES = 15;
 
 function isTooGenericKeyword(kw) {
   if (!kw) return true;
@@ -367,7 +367,7 @@ function buildSearchQueriesFromPreference(prefs, baseArea = "서울") {
 }
 
 // ===================== 네이버 지역 검색 헬퍼 =====================
-async function naverLocalSearch(query, display = 10) {
+async function naverLocalSearch(query, display = 30) {
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
     const credentialError = new Error("NAVER API 자격 증명이 없습니다.");
     console.error("❌ Naver local search credential error");
@@ -641,8 +641,22 @@ app.post("/api/search-with-pref", async (req, res) => {
 
     // 7) 스코어링 에이전트로 점수 계산 + 정렬
     const startPoint = bodyStartPoint || context?.startPoint || null; // { lat, lng } 형식이라고 가정
-    const scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
 
+    // ✅ 디버깅용 로그 추가
+    console.log("🔍 scorePOIs 호출 전:");
+    console.log("  - pois 개수:", pois?.length);
+    console.log("  - startPoint:", startPoint);
+    console.log("  - weights:", weights);
+
+    let scoredPOIs;
+    try {
+      scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
+      console.log("✅ scorePOIs 성공, 결과:", scoredPOIs?.length);
+    } catch (scoreError) {
+      console.error("❌ scorePOIs 에러:", scoreError);
+      console.error("❌ 스택:", scoreError.stack);
+      throw scoreError;
+    }
     // 편향 리포트(Phase C)를 위한 biasDetector 적용
     let biasReport = null;
     try {
@@ -831,7 +845,7 @@ app.post("/api/route/refine", async (req, res) => {
     const scoredPOIs = scorePOIs(pois, safePrefs, weights, anchorPoint, anchorForScoring);
 
     // 8) 상위 N개만 반환 (너무 많지 않게)
-    const TOP_N = 20;
+    const TOP_N = 30;
     const top = scoredPOIs
       .slice()
       .sort((a, b) => (b._score ?? 0) - (a._score ?? 0))
@@ -871,7 +885,7 @@ app.post("/api/travel-wish", async (req, res) => {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const modelName = "gemini-2.0-flash";
+    const modelName = "gemini-2.5-flash";
 
     console.log("🔹 /api/travel-wish 요청:", message);
 

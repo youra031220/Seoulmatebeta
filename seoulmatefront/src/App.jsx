@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  selectPOIs,
   optimizeRoute,
   generateSchedule,
 } from "./planner/routePlanner";
@@ -9,6 +8,7 @@ import {
 import LocationSearch from "./components/LocationSearch/LocationSearch";
 import RequiredStops from "./components/RequiredStops/RequiredStops";
 import Header from "./components/Header/Header";
+import CandidateSelector from "./components/CandidateSelector";
 import "./App.css";
 
 export default function App() {
@@ -89,6 +89,11 @@ export default function App() {
   
   /** refine API 호출용 상태 */
   const [refineLoading, setRefineLoading] = useState(false);
+
+  /** 후보 선택 관련 상태 */
+  const [candidatePOIs, setCandidatePOIs] = useState([]);      // 후보 POI 목록
+  const [showCandidateSelector, setShowCandidateSelector] = useState(false); // 선택 UI 표시
+  const [selectedPOIs, setSelectedPOIs] = useState([]);        // 선택된 POI 목록
 
   
 
@@ -610,89 +615,115 @@ export default function App() {
     }
   };
 
-  /** 🍀 여행 계획 생성 */
-  const onGenerate = async () => {
-  if (!startPoint || !endPoint) {
-    alert(t("alert.need_start_end"));
-    return;
-  }
-
-  // 상태: "생성 중..."
-  setStatusKey("status.generating");
-
-  /** 문자열로 입력받은 시간을 숫자로 변환 + 0~24 범위 클램프 */
-  const startMin = hourToMinutes(startHour);
-  const endMin = hourToMinutes(endHour);
-
-  if (endMin <= startMin) {
-    setStatusKey("status.time_invalid");
-    return;
-  }
-
-  const maxLegNum = Math.max(5, Number(maxLeg) || 0); // 최소 5분
-  const numPlacesNum = Math.max(1, Number(numPlaces) || 0); // 최소 1개
-
-  try {
-    // ✅ 1) 매번 새로 POI 요청 (캐시 재사용 X)
-    const basePOIs = await fetchPoisFromServer();
-    // 원하면 최근 검색 결과를 state에 저장해서 디버깅/추가 기능에 쓸 수 있음
-    setSearchPois(basePOIs);
-
-    // basePOIs가 비어 있으면 routePlanner의 ALL_POIS(샘플)로 fallback (지금은 콘솔 경고만)
-    if (!basePOIs.length) {
-      console.warn("네이버+Gemini POI 없음 → 샘플 ALL_POIS 사용");
-    }
-
-    // ✅ 2) 선택 옵션 기반으로 POI 선택
-    const { pois } = selectPOIs(
-      numPlacesNum,
-      breakfast,
-      lunch,
-      dinner,
-      cafe,
-      dietPrefs,
-      themes,
-      basePOIs,
-      requiredStops // 필수 방문지 전달 (중복 방지용)
-    );
-
-    if (!pois || !pois.length) {
-      setStatusKey("status.no_pois");
+  /** 🔍 1단계: 후보 검색 */
+  const onSearchCandidates = async () => {
+    if (!startPoint || !endPoint) {
+      alert(t("alert.need_start_end"));
       return;
     }
 
-    // ✅ 3) 경로 최적화 (+ 필수 방문지 강제 포함 + 식사 시간대 배치)
-    const opt = optimizeRoute(
-      pois,
-      startPoint,
-      endPoint,
-      startMin,
-      endMin,
-      maxLegNum,
-      requiredStops, // 필수 방문지 포함
-      weights || {}, // 가중치 (체류시간 계산용)
-      { breakfast, lunch, dinner, cafe } // 식사 옵션 (시간대 배치용)
-    );
+    setStatusKey("status.generating");
 
-    // ✅ 4) 시간별 일정 생성
-    const schedule = generateSchedule(
-      opt.routeArray,
-      opt.route,
-      opt.waits,
-      opt.stays,
-      startMin,
-      endMin,
-      startPoint.name,
-      endPoint.name
-    );
+    try {
+      // 백엔드에서 POI 후보 가져오기
+      const basePOIs = await fetchPoisFromServer();
+      setSearchPois(basePOIs);
 
-    setPlan({ ...opt, schedule });
-    setStatusKey("status.success");
-  } catch (e) {
-    console.error(e);
-    setStatusKey("status.error");
-  }
-};
+      if (!basePOIs.length) {
+        setStatusKey("status.no_pois");
+        return;
+      }
+
+      // 후보 목록 저장 및 선택 UI 표시
+      setCandidatePOIs(basePOIs);
+      setShowCandidateSelector(true);
+      setStatusKey(""); // 상태 초기화
+
+    } catch (e) {
+      console.error(e);
+      setStatusKey("status.error");
+    }
+  };
+
+  /** ✅ 2단계: 선택 완료 후 일정 생성 */
+  const onConfirmSelection = async (selected) => {
+    setShowCandidateSelector(false);
+    setSelectedPOIs(selected);
+    setStatusKey("status.generating");
+
+    const startMin = hourToMinutes(startHour);
+    const endMin = hourToMinutes(endHour);
+
+    if (endMin <= startMin) {
+      setStatusKey("status.time_invalid");
+      return;
+    }
+
+    const maxLegNum = Math.max(5, Number(maxLeg) || 0);
+
+    try {
+      // 필수 방문지 + 선택된 POI 합치기
+      const allPois = [...selected];
+
+      // 필수 방문지 추가 (중복 제거)
+      requiredStops.forEach((stop) => {
+        const exists = allPois.some(
+          (p) => p.name === stop.name || p.title === stop.name
+        );
+        if (!exists) {
+          allPois.push({
+            ...stop,
+            categoryType: "required",
+            slotType: "required",
+          });
+        }
+      });
+
+      if (!allPois.length) {
+        setStatusKey("status.no_pois");
+        return;
+      }
+
+      // 경로 최적화
+      const opt = optimizeRoute(
+        allPois,
+        startPoint,
+        endPoint,
+        startMin,
+        endMin,
+        maxLegNum,
+        requiredStops,
+        weights || {},
+        { breakfast, lunch, dinner, cafe }
+      );
+
+      // 시간별 일정 생성
+      const schedule = generateSchedule(
+        opt.routeArray,
+        opt.route,
+        opt.waits,
+        opt.stays,
+        startMin,
+        endMin,
+        startPoint.name,
+        endPoint.name
+      );
+
+      setPlan({ ...opt, schedule });
+      setStatusKey("status.success");
+
+    } catch (e) {
+      console.error(e);
+      setStatusKey("status.error");
+    }
+  };
+
+  /** ❌ 후보 선택 취소 */
+  const onCancelSelection = () => {
+    setShowCandidateSelector(false);
+    setCandidatePOIs([]);
+    setStatusKey("");
+  };
 
 /** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
 const handleSendWish = async () => {
@@ -820,6 +851,34 @@ const handleSendWish = async () => {
   return (
     <div className="app-root">
       <Header />
+
+      {/* 후보 선택 모달 */}
+      {showCandidateSelector && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
+            <CandidateSelector
+              candidates={candidatePOIs}
+              onConfirm={onConfirmSelection}
+              onCancel={onCancelSelection}
+              mealOptions={{ breakfast, lunch, dinner, cafe }}
+              t={t}
+            />
+          </div>
+        </div>
+      )}
 
       {/* 데스크탑: 850px / 1fr 2열, 모바일: 세로로 쌓이는 레이아웃 */}
       <div className="app-layout">
@@ -1486,7 +1545,7 @@ const handleSendWish = async () => {
 
           {/* 하단: 여행계획 생성 버튼 */}
           <button
-            onClick={onGenerate}
+            onClick={onSearchCandidates}
             style={{
               marginTop: 5,
               width: "100%",
