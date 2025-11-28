@@ -141,11 +141,6 @@ export function detectSearchBias(pois, requiredStops = [], userThemes = []) {
     }
   }
 
-  // 4) 데이터 부족: POI가 10개 미만이면 부족
-  if (total < 10) {
-    result.issues.push(`추천 가능한 장소 수가 ${total}개로 많지 않아요.`);
-  }
-
   if (result.issues.length > 0) {
     result.isBiased = true;
     // 기본 제안 메시지
