@@ -52,6 +52,92 @@ function buildPrefsForWeight(rawPrefs, rawContext) {
   };
 }
 
+// 🔤 장소명/카테고리 다국어 변환 헬퍼 (Gemini 사용)
+async function translatePoisForLanguage(pois, targetLang = "ko") {
+  // 1) 유효성/언어 체크
+  if (!Array.isArray(pois) || !pois.length) return pois;
+  if (!targetLang || targetLang === "ko") return pois; // 한국어면 번역 불필요
+  if (!genAIClient) {
+    console.warn("⚠️ genAIClient 없음, 번역 생략");
+    return pois;
+  }
+
+  try {
+    const model = genAIClient.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    // 2) 프롬프트에 넣을 최소 정보만 구성
+    const minimal = pois.map((p, idx) => ({
+      idx,
+      name: String(p.title || p.name || "")
+        .replace(/<[^>]+>/g, "")
+        .trim(),
+      category: String(p.category || p.categoryType || "").trim(),
+    }));
+
+    const prompt = `
+You are a translation helper for a travel itinerary web app.
+
+- Input: JSON array of places (idx, name, category), where "name" and "category" are in Korean.
+- Translate both "name" and "category" into language code "${targetLang}".
+- Keep brand names (e.g. "Starbucks") as commonly used in that language.
+- If something is already not Korean, you can keep it as is.
+- Return ONLY valid JSON, no explanations, no comments.
+
+Output format example:
+[
+  { "idx": 0, "name_translated": "Gyeongbokgung Palace", "category_translated": "Attractions > Palace" },
+  { "idx": 1, "name_translated": "Naksan Park", "category_translated": "Park & Viewpoint" }
+]
+
+Input JSON:
+${JSON.stringify(minimal, null, 2)}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result?.response?.text() || "[]";
+
+    let parsed = [];
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      console.error("❌ translatePoisForLanguage JSON parse error:", e?.message || e);
+      return pois;
+    }
+
+    const map = new Map();
+    for (const item of parsed) {
+      if (typeof item.idx === "number") {
+        map.set(item.idx, item);
+      }
+    }
+
+    // 3) 원본 POI에 번역 필드를 붙여서 반환
+    return pois.map((p, i) => {
+      const tr = map.get(i) || {};
+      const originalTitle = String(p.title || p.name || "").trim();
+
+      return {
+        ...p,
+        // 원본 한글 제목은 그대로 유지 (p.title)
+        titleTranslated:
+          (tr.name_translated || tr.name || "").trim() || originalTitle,
+        categoryTranslated:
+          (tr.category_translated || tr.category || "").trim() ||
+          String(p.category || p.categoryType || "").trim(),
+      };
+    });
+  } catch (error) {
+    console.error("⚠️ translatePoisForLanguage 실패, 원본 사용:", error?.message || error);
+    return pois;
+  }
+}
+
+
 dotenv.config();
 
 const app = express();
@@ -523,6 +609,7 @@ app.post("/api/search-with-pref", async (req, res) => {
       message = "",
       context = {},
       startPoint: bodyStartPoint,
+      lang = "ko",  // 🔹 추가: 프론트에서 넘겨줄 언어 코드
     } = req.body || {};
 
     if (!baseArea.trim() || !message.trim()) {
@@ -636,6 +723,9 @@ app.post("/api/search-with-pref", async (req, res) => {
     // 6) 최종 결과에 categoryType 태그 붙여서 반환
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 
@@ -656,7 +746,15 @@ app.post("/api/search-with-pref", async (req, res) => {
       console.warn("⚠️ biasReport 생성 중 오류 (무시하고 진행):", e?.message || e);
     }
 
-    return res.json({ prefs: safePrefs, weights, city, pois: scoredPOIs, biasReport });
+    // 🔤 언어에 맞춰 장소명/카테고리 번역 (ko 이면 생략)
+    let poisForClient = scoredPOIs;
+    try {
+      poisForClient = await translatePoisForLanguage(scoredPOIs, lang);
+    } catch (e) {
+      console.warn("⚠️ POI 번역 실패, 원본 그대로 사용:", e?.message || e);
+    }
+
+    return res.json({ prefs: safePrefs, weights, city, pois: poisForClient, biasReport });
   } catch (error) {
     console.error("❌ /api/search-with-pref 처리 실패:", error?.message || error);
     return res
@@ -817,6 +915,9 @@ app.post("/api/route/refine", async (req, res) => {
 
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 

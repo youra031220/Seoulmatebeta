@@ -4,8 +4,8 @@ import {
   PACE_MULTIPLIER,
   toMinutes,
   toTimeString,
-  calculateStayTime,
-} from "./constants/timeConstants.js";
+} from "../utils/timeConstants.js";
+import { useTranslation } from "react-i18next";
 
 /* ===================== 샘플 POI/기본 위치 ===================== */
 /**
@@ -424,15 +424,27 @@ export function optimizeRoute(
     .map((r) => {
       const category = r.category || "required";
       const calculatedStayTime = getStayTime(category, pace, weights);
+
       return {
+        // 기본 이름
         name: r.name || "필수 방문지",
+
+        // 🔹 한글/영문 이름 모두 보존
+        nameKo: r.nameKo || r.name || "필수 방문지",
+        nameTranslated: r.nameTranslated || "",
+
         lat: r.lat,
         lon: r.lon,
         stay_time: r.stay_time ?? calculatedStayTime,
+
+        // 🔹 카테고리도 한글/영문 둘 다 보존
         category,
+        categoryKo: r.categoryKo || category,
+        categoryTranslated: r.categoryTranslated || "",
+
         rating: r.rating ?? "-",
         isRequired: true,
-        isMustVisit: true, // Step A-5: 필수 방문지 강제 포함 플래그
+        isMustVisit: true, // 필수 방문지 강제 포함
       };
     });
 
@@ -440,12 +452,24 @@ export function optimizeRoute(
   const optional = (pois || []).map((p) => {
     const category = p.category || p.categoryType || "spot";
     const calculatedStayTime = getStayTime(category, pace, weights);
+
     return {
+      // 기본 표시 이름
       name: p.name,
+
+      // 🔹 한글/영문 이름 모두 전달
+      nameKo: p.nameKo || p.name,
+      nameTranslated: p.nameTranslated || "",
+
       lat: p.lat,
       lon: p.lon,
       stay_time: p.stay_time ?? calculatedStayTime,
+
+      // 🔹 카테고리도 한글/영문 정보 유지
       category,
+      categoryKo: p.categoryKo || category,
+      categoryTranslated: p.categoryTranslated || "",
+
       rating: p.rating ?? "-",
       isRequired: false,
     };
@@ -968,6 +992,69 @@ export function generateSchedule(
   let now = startMin;
   let prevDepart = startMin; // 이전 출발 시간 추적
 
+  // 🔹 출발/도착 이름을 문자열/객체 어떤 형태로 받아도 통일해서 쓰기
+  const startInfo =
+    typeof startName === "string" || !startName
+      ? {
+          name: startName || "",
+          nameKo: startName || "",
+          nameTranslated: "",
+        }
+      : {
+          name: startName.name ?? "",
+          nameKo: startName.nameKo ?? startName.name ?? "",
+          nameTranslated: startName.nameTranslated ?? "",
+        };
+
+  const endInfo =
+    typeof endName === "string" || !endName
+      ? {
+          name: endName || "",
+          nameKo: endName || "",
+          nameTranslated: "",
+        }
+      : {
+          name: endName.name ?? "",
+          nameKo: endName.nameKo ?? endName.name ?? "",
+          nameTranslated: endName.nameTranslated ?? "",
+        };
+
+  // 🔹 타입별로 name / nameKo / nameTranslated를 통일해서 뽑는 함수
+  const getNames = (type, poi) => {
+    if (type === "start") {
+      const base = startPoint?.name ?? "";
+      const ko = startPoint?.nameKo ?? base;
+      const tr = startPoint?.nameTranslated ?? "";
+      return {
+        // base는 그냥 참고용, 실제로는 tr이 있으면 그걸 우선 사용
+        name: tr || base,
+        nameKo: ko,
+        nameTranslated: tr,
+      };
+    }
+
+    if (type === "end") {
+      const base = endPoint?.name ?? "";
+      const ko = endPoint?.nameKo ?? base;
+      const tr = endPoint?.nameTranslated ?? "";
+      return {
+        name: tr || base,
+        nameKo: ko,
+        nameTranslated: tr,
+      };
+    }
+
+    // 그 외 일반 POI
+    const base = poi?.name || "";
+    const ko = poi?.nameKo ?? poi?.name ?? base;
+    const tr = poi?.nameTranslated ?? "";
+    return {
+      name: base,
+      nameKo: ko,
+      nameTranslated: tr,
+    };
+  };
+
   for (let i = 0; i < route.length; i++) {
     const idx = route[i];
     const [type, node] = routeArray[idx];
@@ -1004,23 +1091,40 @@ export function generateSchedule(
       const depart = toHM(now);
       
       const rating = poi?.rating ?? null;
-      const name =
-        type === "start"
-          ? startName
-          : type === "end"
-          ? endName
-          : poi?.name || "";
 
-      rows.push({
-        order: i + 1,
-        name,
-        category,
-        arrival,
-        depart,
-        wait,
-        stay: adjustedStay,
-        rating,
-      });
+    // 🔹 타입별로 name / nameKo / nameTranslated 결정
+    let name, nameKo, nameTranslated;
+
+    if (type === "start") {
+      // 출발지: startInfo 사용
+      ({ name, nameKo, nameTranslated } = startInfo);
+    } else if (type === "end") {
+      // 도착지: endInfo 사용
+      ({ name, nameKo, nameTranslated } = endInfo);
+    } else {
+      // 일반/필수 방문지: POI에서 가져오기
+      name = poi?.name || "";
+      nameKo = poi?.nameKo ?? poi?.name ?? name;
+      nameTranslated = poi?.nameTranslated ?? "";
+    }
+
+    const categoryKo = poi?.categoryKo ?? poi?.category ?? category;
+    const categoryTranslated = poi?.categoryTranslated ?? "";
+
+    rows.push({
+      order: i + 1,
+      name,
+      nameKo,
+      nameTranslated,
+      category,
+      categoryKo,
+      categoryTranslated,
+      arrival,
+      depart,
+      wait,
+      stay,
+      rating,
+    });
       
       // end 타입이 아니면 중단, end 타입이면 포함 후 종료
       if (type !== "end") {
@@ -1035,17 +1139,33 @@ export function generateSchedule(
 
     const rating = poi?.rating ?? null;
 
-    const name =
-      type === "start"
-        ? startName
-        : type === "end"
-        ? endName
-        : poi?.name || "";
+    // 🔹 타입별로 name / nameKo / nameTranslated 결정
+    let name, nameKo, nameTranslated;
+
+    if (type === "start") {
+      // 출발지: startInfo 사용
+      ({ name, nameKo, nameTranslated } = startInfo);
+    } else if (type === "end") {
+      // 도착지: endInfo 사용
+      ({ name, nameKo, nameTranslated } = endInfo);
+    } else {
+      // 일반/필수 방문지: POI에서 가져오기
+      name = poi?.name || "";
+      nameKo = poi?.nameKo ?? poi?.name ?? name;
+      nameTranslated = poi?.nameTranslated ?? "";
+    }
+
+    const categoryKo = poi?.categoryKo ?? poi?.category ?? category;
+    const categoryTranslated = poi?.categoryTranslated ?? "";
 
     rows.push({
       order: i + 1,
       name,
+      nameKo,
+      nameTranslated,
       category,
+      categoryKo,
+      categoryTranslated,
       arrival,
       depart,
       wait,
@@ -1053,11 +1173,11 @@ export function generateSchedule(
       rating,
     });
 
-    // end 타입이면 반드시 마지막이어야 함
-    if (type === "end") {
-      break;
-    }
-  }
+        // end 타입이면 반드시 마지막이어야 함
+        if (type === "end") {
+          break;
+        }
+      }
 
   // 검증: 마지막 항목이 end인지 확인
   if (rows.length > 0) {
