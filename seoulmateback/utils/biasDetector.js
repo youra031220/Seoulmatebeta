@@ -82,7 +82,7 @@ export function detectSearchBias(pois, requiredStops = [], userThemes = []) {
     let nearCount = 0;
 
     for (const poi of pois) {
-      const lat = poi.lat ?? (poi.mapy ? parseFloat(poi.mapy) / 1e7 : null);
+      const lat = poi.lat ?? (poi.mapy ? parseFloat(poi.mapy) : null);
       const lon = poi.lon ?? (poi.mapx ? parseFloat(poi.mapx) / 1e7 : null);
       if (lat == null || lon == null) continue;
 

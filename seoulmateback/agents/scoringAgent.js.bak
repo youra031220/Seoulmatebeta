@@ -9,9 +9,9 @@ export function calculateDistance(point1, point2) {
   if (!point1 || !point2) return null;
 
   const lat1 = parseFloat(point1.lat);
-  const lon1 = parseFloat(point1.lng);
+  const lon1 = parseFloat(point1.lng ?? point1.lon);  // ✅ 둘 다 허용
   const lat2 = parseFloat(point2.lat);
-  const lon2 = parseFloat(point2.lng);
+  const lon2 = parseFloat(point2.lng ?? point2.lon);  // ✅ 둘 다 허용
 
   if (
     Number.isNaN(lat1) ||
@@ -77,6 +77,16 @@ export function checkTagMatch(poi, tag) {
  * 회피 대상 매칭 (예: "비싼 레스토랑", "사람 많은 곳")
  * - 아주 러프하게 키워드 단위로만 체크
  */
+export function normalizeCoord(point) {
+  if (!point) return null;
+  
+  const lat = parseFloat(point.lat ?? point.mapy);
+  const lng = parseFloat(point.lng ?? point.lon ?? point.mapx);
+  
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+  
+  return { lat, lng };
+}
 export function checkAvoidMatch(poi, avoidItem, prefs) {
   if (!avoidItem) return false;
   const target = (
