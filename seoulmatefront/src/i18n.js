@@ -1062,6 +1062,118 @@ const resources = {
         "Es wurde noch kein Zeitplan erstellt, daher sind keine Ortsinformationen verfügbar.",
     },
   },
+  fr: {
+    translation: {
+      "app.title": "Seoulmate",
+
+      "header.subtitle":
+        "Planifie ton voyage à Séoul avec Seoulmate, optimisé pour tes préférences alimentaires, ta tolérance à l’attente, les passages partiels et les heures de début/fin !",
+
+      "startend.pointsetting": "Définir le point de départ et d’arrivée",
+      "search.start": "Rechercher le point de départ",
+      "search.end": "Rechercher la destination",
+      "same.startend": "Départ et arrivée identiques",
+
+      "map.marker.start_end": "Départ / Arrivée",
+      "map.marker.start": "Départ",
+      "map.marker.end": "Arrivée",
+
+      "alert.need_start_end":
+        "Merci de sélectionner un point de départ et une destination.",
+      "status.generating": "Génération de ton itinéraire...",
+      "status.time_invalid":
+        "L’heure de fin doit être plus tardive que l’heure de début.",
+      "status.no_pois":
+        "Aucun lieu adapté n’a pu être trouvé.",
+      "status.success": "✔️ Ton itinéraire a été généré !",
+      "status.error":
+        "Une erreur est survenue lors de la génération de l’itinéraire.",
+
+      "unit.minute": "min",
+      "unit.place_count": "lieux",
+      "unit.hour": "h",
+
+      "button.generate": "Générer l’itinéraire",
+      "button.send": "SEND",
+      "button.reset": "Réinitialiser",
+
+      "meals.title": "Repas",
+      "meals.breakfast": "Petit-déjeuner",
+      "meals.lunch": "Déjeuner",
+      "meals.dinner": "Dîner",
+      "meals.cafe": "Café · Dessert",
+
+      "diet.title": "Préférences alimentaires",
+      "diet.halal": "Halal",
+      "diet.vegan": "Vegan",
+      "diet.vegetarian": "Végétarien",
+      "diet.kosher": "Kasher",
+      "diet.gluten_free": "Sans gluten",
+      "diet.non_alcohol": "Sans alcool",
+
+      "theme.title": "Thèmes de voyage (jusqu’à 3)",
+      "theme.shopping": "Shopping",
+      "theme.culture": "Culture · Expositions · Histoire",
+      "theme.nature": "Nature · Parcs",
+      "theme.cafe_tour": "Café hopping",
+      "theme.night_photo": "Vue de nuit · Spots photo",
+      "theme.healing": "Détente / Healing",
+      "theme.kpop": "Lié au K-pop",
+      "theme.sns_hot": "Lieux populaires sur les réseaux",
+
+      "wait.title": "Tolérance à l’attente",
+      "wait.low": "Je n’aime pas faire la queue",
+      "wait.medium": "Un peu d’attente, ça va",
+      "wait.high":
+        "Pour un spot célèbre, je peux patienter",
+
+      "transport.title": "Moyen de transport préféré",
+      "transport.walk": "Principalement à pied",
+      "transport.transit": "Principalement transports en commun",
+      "transport.taxi": "Principalement taxi / voiture",
+
+      "move.title": "Déplacements · Lieux",
+      "move.max_leg": "Temps de trajet max par segment",
+      "move.num_places": "Nombre total de lieux",
+
+      "time.title": "Réglages de l’horaire",
+      "time.start": "Heure de début",
+      "time.end": "Heure de fin",
+
+      "required.title": "Rechercher · ajouter des lieux incontournables",
+      "required.examples":
+        "Namsan Tower, Palais Gyeongbokgung, café hanok...",
+
+      "wish.title": "Qu’attends-tu de ce voyage ?",
+      "wish.placeholder":
+        "Après avoir sélectionné toutes les catégories de base, commence la conversation avec un petit salut ! Tu peux aussi détailler tes préférences de voyage : budget, ambiance souhaitée, niveau de marche, style préféré, etc.",
+      "wish.hover":
+        "Parle librement de tes préférences de voyage et nous te proposerons automatiquement des options d’itinéraire adaptées !",
+      "wish.hover1": "Tu peux par exemple écrire :",
+      "wish.hover2":
+        "Je ne veux pas trop marcher et je veux des restaurants célèbres pour le déjeuner.",
+      "wish.hover3":
+        "Je veux absolument essayer un restaurant de Korean BBQ réputé.",
+      "wish.hover4":
+        "Je veux visiter une exposition avec une ambiance science-fiction.",
+      "wish.hover5":
+        "Je veux absolument voir la vue nocturne de Séoul.",
+
+      "schedule.title": "Itinéraire",
+      "schedule.none":
+        "Aucun itinéraire n’a encore été généré.",
+      "schedule.col.order": "#",
+      "schedule.col.name": "Lieu",
+      "schedule.col.category": "Catégorie",
+      "schedule.col.arrival": "Arrivée",
+      "schedule.col.depart": "Départ",
+
+      "specifics.title": "Détails du lieu",
+      "specifics.none":
+        "Aucun itinéraire n’a été généré pour le moment, les informations de lieu ne sont donc pas disponibles.",
+    },
+  },
+
 };
 
 i18n.use(initReactI18next).init({

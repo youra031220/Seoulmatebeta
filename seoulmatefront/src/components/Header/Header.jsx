@@ -21,6 +21,7 @@ export default function Header() {
     id: "Bahasa Indonesia (ID)",
     es: "Español (ES)",
     de: "Deutsch (DE)",
+    fr: "French (FR)",
   };
 
   // i18n에 등록된 리소스 키 가져오기
