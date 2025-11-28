@@ -1,6 +1,7 @@
 // src/main.jsx
 import "./index.css";
 import "./i18n";
+<<<<<<< HEAD
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import Root from "./Root";
