@@ -484,7 +484,7 @@ export default function App() {
     console.log("📤 백엔드로 보내는 메시지:", travelMessage);
     console.log("📤 컨텍스트:", { breakfast, lunch, dinner, cafe, dietPrefs, themes, pace });
     try {
-      const res = await fetch("http://localhost:5000/api/search-with-pref", {
+      const res = await fetch("http://localhost:5001/api/search-with-pref", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -705,7 +705,7 @@ export default function App() {
 
     setRefineLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/route/refine", {
+      const res = await fetch("http://localhost:5001/api/route/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1032,7 +1032,7 @@ const handleSendWish = async () => {
   setWishText("");
 
   try {
-    const res = await fetch("http://localhost:5000/api/travel-wish", {
+    const res = await fetch("http://localhost:5001/api/travel-wish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1930,7 +1930,7 @@ const handleSendWish = async () => {
                 </thead>
                 <tbody>
                 {plan.schedule.map((r) => {
-    const flags = getPlaceLangFlags(r.name,getActiveLangCodes());
+    const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
 
     return (
       <tr key={r.order}>
@@ -2059,7 +2059,7 @@ const handleSendWish = async () => {
             {plan?.schedule?.length ? (
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
               {plan.schedule.map((r) => {
-                const flags = getPlaceLangFlags(r.name, getActiveLangCodes());
+                const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
             
                 return (
                   <li key={r.order} style={{ marginBottom: 6 }}>
