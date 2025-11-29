@@ -22,6 +22,7 @@ export default function LocationSearch({ onChange }) {
 
   const boxRef = useRef(null);
   const debounceRef = useRef(null);
+  const lastPayloadRef = useRef(null);
 
   // 부모에게 위치 변경 전달
   useEffect(() => {
@@ -43,11 +44,20 @@ export default function LocationSearch({ onChange }) {
       };
     };
 
-    onChange({
+    const payload = {
       start: convert(selectedStart),
       end: sameStartEnd ? convert(selectedStart) : convert(selectedEnd),
       sameStartEnd,
-    });
+    };
+
+    // 🔒 이전에 부모에게 넘긴 값과 완전히 같으면 다시 호출하지 않음 → 무한 루프 방지
+    const last = lastPayloadRef.current;
+    if (last && JSON.stringify(last) === JSON.stringify(payload)) {
+      return;
+    }
+
+    lastPayloadRef.current = payload;
+    onChange(payload);
   }, [selectedStart, selectedEnd, sameStartEnd, onChange]);
 
   // 인풋 값 변경 → 디바운싱 검색
