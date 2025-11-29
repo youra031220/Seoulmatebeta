@@ -266,5 +266,86 @@ body {
    
 }
 
+/* ===== ATLAS 엔진 로딩 UI ===== */
+.atlas-loading {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 0% 0%, #4c1d95, #020617);
+  color: #e5e7eb;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.5);
+  max-width: 100%;
+}
+
+.atlas-logo-spinner {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 3px solid rgba(148, 163, 184, 0.5);
+  border-top-color: #f97316;
+  border-right-color: #ec4899;
+  border-bottom-color: #6366f1;
+  animation: atlas-spin 1s linear infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 0%, #1d2433, #020617);
+}
+
+.atlas-logo-text {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #e5e7eb;
+}
+
+.atlas-loading-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.atlas-powered {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.atlas-status {
+  font-size: 12px;
+  color: #cbd5f5;
+}
+
+/* 다른 상태 메시지(성공/에러 등)용 기본 스타일 */
+.status-text {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #16a34a;
+}
+
+/* 로딩 스피너 회전 */
+@keyframes atlas-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.atlas-loading-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;  /* 오른쪽 정렬 유지 */
+  align-items: center;
+  min-height: 76px;           /* 🔥 이 높이만큼은 항상 자리 차지 */
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
 
 
