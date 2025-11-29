@@ -52,6 +52,92 @@ function buildPrefsForWeight(rawPrefs, rawContext) {
   };
 }
 
+// 🔤 장소명/카테고리 다국어 변환 헬퍼 (Gemini 사용)
+async function translatePoisForLanguage(pois, targetLang = "ko") {
+  // 1) 유효성/언어 체크
+  if (!Array.isArray(pois) || !pois.length) return pois;
+  if (!targetLang || targetLang === "ko") return pois; // 한국어면 번역 불필요
+  if (!genAIClient) {
+    console.warn("⚠️ genAIClient 없음, 번역 생략");
+    return pois;
+  }
+
+  try {
+    const model = genAIClient.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    // 2) 프롬프트에 넣을 최소 정보만 구성
+    const minimal = pois.map((p, idx) => ({
+      idx,
+      name: String(p.title || p.name || "")
+        .replace(/<[^>]+>/g, "")
+        .trim(),
+      category: String(p.category || p.categoryType || "").trim(),
+    }));
+
+    const prompt = `
+You are a translation helper for a travel itinerary web app.
+
+- Input: JSON array of places (idx, name, category), where "name" and "category" are in Korean.
+- Translate both "name" and "category" into language code "${targetLang}".
+- Keep brand names (e.g. "Starbucks") as commonly used in that language.
+- If something is already not Korean, you can keep it as is.
+- Return ONLY valid JSON, no explanations, no comments.
+
+Output format example:
+[
+  { "idx": 0, "name_translated": "Gyeongbokgung Palace", "category_translated": "Attractions > Palace" },
+  { "idx": 1, "name_translated": "Naksan Park", "category_translated": "Park & Viewpoint" }
+]
+
+Input JSON:
+${JSON.stringify(minimal, null, 2)}
+    `;
+
+    const result = await model.generateContent(prompt);
+    const text = result?.response?.text() || "[]";
+
+    let parsed = [];
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      console.error("❌ translatePoisForLanguage JSON parse error:", e?.message || e);
+      return pois;
+    }
+
+    const map = new Map();
+    for (const item of parsed) {
+      if (typeof item.idx === "number") {
+        map.set(item.idx, item);
+      }
+    }
+
+    // 3) 원본 POI에 번역 필드를 붙여서 반환
+    return pois.map((p, i) => {
+      const tr = map.get(i) || {};
+      const originalTitle = String(p.title || p.name || "").trim();
+
+      return {
+        ...p,
+        // 원본 한글 제목은 그대로 유지 (p.title)
+        titleTranslated:
+          (tr.name_translated || tr.name || "").trim() || originalTitle,
+        categoryTranslated:
+          (tr.category_translated || tr.category || "").trim() ||
+          String(p.category || p.categoryType || "").trim(),
+      };
+    });
+  } catch (error) {
+    console.error("⚠️ translatePoisForLanguage 실패, 원본 사용:", error?.message || error);
+    return pois;
+  }
+}
+
+
 dotenv.config();
 
 const app = express();
@@ -111,7 +197,7 @@ async function analyzeTravelPreference(message, context = {}, requiredStopNames 
     throw new Error("Gemini 클라이언트가 초기화되지 않았습니다.");
   }
 
-  const modelName = "gemini-2.0-flash";
+  const modelName = "gemini-2.5-flash";
 
   const aiModel = genAIClient.getGenerativeModel({
     model: modelName,
@@ -235,8 +321,8 @@ ${JSON.stringify(context, null, 2)}
 const GENERIC_KEYWORDS = new Set(["맛집", "카페", "명소", "관광지", "데이트", "핫플레이스"]);
 
 // Poi/Food 쿼리 개수 상한 (Rate limit 방지용)
-const MAX_POI_QUERIES = 6;
-const MAX_FOOD_QUERIES = 6;
+const MAX_POI_QUERIES = 15;
+const MAX_FOOD_QUERIES = 15;
 
 function isTooGenericKeyword(kw) {
   if (!kw) return true;
@@ -367,7 +453,7 @@ function buildSearchQueriesFromPreference(prefs, baseArea = "서울") {
 }
 
 // ===================== 네이버 지역 검색 헬퍼 =====================
-async function naverLocalSearch(query, display = 10) {
+async function naverLocalSearch(query, display = 30) {
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
     const credentialError = new Error("NAVER API 자격 증명이 없습니다.");
     console.error("❌ Naver local search credential error");
@@ -523,6 +609,7 @@ app.post("/api/search-with-pref", async (req, res) => {
       message = "",
       context = {},
       startPoint: bodyStartPoint,
+      lang = "ko",  // 🔹 추가: 프론트에서 넘겨줄 언어 코드
     } = req.body || {};
 
     if (!baseArea.trim() || !message.trim()) {
@@ -636,13 +723,30 @@ app.post("/api/search-with-pref", async (req, res) => {
     // 6) 최종 결과에 categoryType 태그 붙여서 반환
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 
     // 7) 스코어링 에이전트로 점수 계산 + 정렬
     const startPoint = bodyStartPoint || context?.startPoint || null; // { lat, lng } 형식이라고 가정
-    const scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
 
+    // ✅ 디버깅용 로그 추가
+    console.log("🔍 scorePOIs 호출 전:");
+    console.log("  - pois 개수:", pois?.length);
+    console.log("  - startPoint:", startPoint);
+    console.log("  - weights:", weights);
+
+    let scoredPOIs;
+    try {
+      scoredPOIs = scorePOIs(pois, safePrefs, weights, startPoint);
+      console.log("✅ scorePOIs 성공, 결과:", scoredPOIs?.length);
+    } catch (scoreError) {
+      console.error("❌ scorePOIs 에러:", scoreError);
+      console.error("❌ 스택:", scoreError.stack);
+      throw scoreError;
+    }
     // 편향 리포트(Phase C)를 위한 biasDetector 적용
     let biasReport = null;
     try {
@@ -656,7 +760,15 @@ app.post("/api/search-with-pref", async (req, res) => {
       console.warn("⚠️ biasReport 생성 중 오류 (무시하고 진행):", e?.message || e);
     }
 
-    return res.json({ prefs: safePrefs, weights, city, pois: scoredPOIs, biasReport });
+    // 🔤 언어에 맞춰 장소명/카테고리 번역 (ko 이면 생략)
+    let poisForClient = scoredPOIs;
+    try {
+      poisForClient = await translatePoisForLanguage(scoredPOIs, lang);
+    } catch (e) {
+      console.warn("⚠️ POI 번역 실패, 원본 그대로 사용:", e?.message || e);
+    }
+
+    return res.json({ prefs: safePrefs, weights, city, pois: poisForClient, biasReport });
   } catch (error) {
     console.error("❌ /api/search-with-pref 처리 실패:", error?.message || error);
     return res
@@ -817,6 +929,9 @@ app.post("/api/route/refine", async (req, res) => {
 
     const pois = Array.from(uniqueMap.values()).map((item) => ({
       ...item,
+      name: item.translatedName || item.title, // 영어/기본 이름
+      nameKo: item.title,                      // 한국어 원래 이름
+
       categoryType: classifyItem(item),
     }));
 
@@ -831,7 +946,7 @@ app.post("/api/route/refine", async (req, res) => {
     const scoredPOIs = scorePOIs(pois, safePrefs, weights, anchorPoint, anchorForScoring);
 
     // 8) 상위 N개만 반환 (너무 많지 않게)
-    const TOP_N = 20;
+    const TOP_N = 30;
     const top = scoredPOIs
       .slice()
       .sort((a, b) => (b._score ?? 0) - (a._score ?? 0))
@@ -871,7 +986,7 @@ app.post("/api/travel-wish", async (req, res) => {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const modelName = "gemini-2.0-flash";
+    const modelName = "gemini-2.5-flash";
 
     console.log("🔹 /api/travel-wish 요청:", message);
 
