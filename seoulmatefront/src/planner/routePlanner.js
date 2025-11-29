@@ -62,16 +62,16 @@ export const ALL_POIS = [
 
 // 언어 코드별 국기/라벨
 const LANGUAGE_FLAGS = {
-  ko: { code: "ko", label: "한국어 사용자 선호", flag: "🇰🇷" },
-  en: { code: "en", label: "English user favorite", flag: "🇺🇸" }, // 필요하면 🇬🇧 등으로 변경
-  zh_CN: { code: "zh-CN", label: "중국어 사용자 선호",      flag: "🇨🇳" },
-  zh_TW: { code: "zh-TW", label: "대만어 사용자 선호",      flag: "🇹🇼" },
-  vi: { code: "vi", label: "베트남어 사용자 선호",      flag: "🇻🇳" },
-  ja: { code: "ja", label: "일본어 사용자 선호",      flag: "🇯🇵" },
-  th: { code: "th", label: "태국어 사용자 선호",      flag: "🇹🇭" },
-  id: { code: "id", label: "인도네시아어 사용자 선호",      flag: "🇮🇩" },
-  es: { code: "es", label: "스페인어 사용자 선호",      flag: "🇪🇸" },
-  de: { code: "de", label: "독일어 사용자 선호",      flag: "🇩🇪" },
+  ko: { code: "ko", label: "한국어 사용자 선호", countryCode: "KR" },
+  en: { code: "en", label: "English user favorite", countryCode: "US" }, // 필요하면 🇬🇧 등으로 변경
+  zh_CN: { code: "zh-CN", label: "중국어 사용자 선호",      countryCode: "CN" },
+  zh_TW: { code: "zh-TW", label: "대만어 사용자 선호",      countryCode: "TW" },
+  vi: { code: "vi", label: "베트남어 사용자 선호",      countryCode: "VN" },
+  ja: { code: "ja", label: "일본어 사용자 선호",      countryCode: "JP" },
+  th: { code: "th", label: "태국어 사용자 선호",      countryCode: "TH" },
+  id: { code: "id", label: "인도네시아어 사용자 선호",      countryCode: "ID" },
+  es: { code: "es", label: "스페인어 사용자 선호",      countryCode: "ES" },
+  de: { code: "de", label: "독일어 사용자 선호",      countryCode: "DE" },
 };
 
 // 장소 이름을 매칭하기 위한 간단한 정규화

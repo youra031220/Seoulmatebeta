@@ -1,3 +1,4 @@
+import ReactCountryFlag from "react-country-flag";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -1735,20 +1736,27 @@ const handleSendWish = async () => {
             : r.nameTranslated && r.nameTranslated !== (r.nameKo || r.name)
             ? `${r.nameTranslated} (${r.nameKo || r.name})` // 예: Gyeongbokgung Palace (경복궁)
             : (r.nameKo || r.name)}
+
           {flags.length > 0 && (
             <span style={{ marginLeft: 6 }}>
               {flags.map((info) => (
-                <span
+                <ReactCountryFlag
                   key={info.code}
+                  countryCode={info.countryCode}    // "KR", "US" ...
+                  svg
                   title={info.label}
-                  style={{ marginRight: 4 }}
-                >
-                  {info.flag}
-                </span>
+                  style={{
+                    width: "1em",
+                    height: "1em",
+                    marginRight: 4,
+                    verticalAlign: "middle",
+                  }}
+                />
               ))}
             </span>
           )}
         </td>
+        <td style={{ padding: "4px 0" }}>{formatCategory(r)}</td>
         {/* 🔹 카테고리: 번역 + / + 한국어 */}
         <td style={{ padding: "4px 0" }}>
           {(() => {
@@ -1854,16 +1862,21 @@ const handleSendWish = async () => {
                       {r.order}. {formatPlaceName(r)}
                       {flags.length > 0 && (
                         <span style={{ marginLeft: 6 }}>
-                          {flags.map((info) => (
-                            <span
-                              key={info.code}
-                              title={info.label}
-                              style={{ marginRight: 4 }}
-                            >
-                              {info.flag}
-                              </span>
-                          ))}
-                        </span>
+                         {flags.map((info) => (
+                            <ReactCountryFlag
+                            key={info.code}
+                            countryCode={info.countryCode}
+                            svg
+                            title={info.label}
+                            style={{
+                              width: "1em",
+                              height: "1em",
+                              marginRight: 4,
+                              verticalAlign: "middle",
+                            }}
+                          />
+                        ))}
+                      </span>
                       )}
                     </b>{" "}
                      —{" "}
