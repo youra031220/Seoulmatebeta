@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   optimizeRoute,
   generateSchedule,
-  getPlaceLangFlags, // 새로 추가
+  getPlaceLangFlags,
 } from "./planner/routePlanner";
 
 import LocationSearch from "./components/LocationSearch/LocationSearch";
@@ -14,7 +14,7 @@ import "./App.css";
 
 export default function App() {
   const { t, i18n } = useTranslation();
-  const currentLang = i18n.language || "ko";   // 🔹 이 줄만 추가
+  const currentLang = i18n.language || "ko"
 
   // 🔹 모든 장소 공통: "영문이름 (한국어 이름)" 형식으로 출력
   const formatPlaceName = (row) => {
@@ -68,18 +68,16 @@ export default function App() {
     if (lang.startsWith("ko")) return ["ko"];
     if (lang.startsWith("en")) return ["en"];
     if (lang.startsWith("ja")) return ["ja"];
-    if (lang.startsWith("zh-CN")) return ["zh_CN"]; // zh-CN / zh-TW 모두 포함
+    if (lang.startsWith("zh-CN")) return ["zh_CN"];
     if (lang.startsWith("zh-TW")) return ["zh_TW"];
     if (lang.startsWith("vi")) return ["vi"];
     if (lang.startsWith("th")) return ["th"];
     if (lang.startsWith("id")) return ["id"];
     if (lang.startsWith("es")) return ["es"];
     if (lang.startsWith("de")) return ["de"];
-  
-    // ko, vi, th, id, es, de 등은 "선호언어 DB"에 없으므로 국기 표시 없음
     return [];
   };
-  
+
 
   /** 출발 / 도착 */
   const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
@@ -489,7 +487,6 @@ export default function App() {
         body: JSON.stringify({
           baseArea: "서울",
           message: travelMessage,
-          lang: i18n.language,   // 🔹 ko / en / ja
           context: {
             breakfast,
             lunch,
@@ -565,29 +562,29 @@ export default function App() {
           p.category || ""
         );
 
-      return {
-        id: idx,
-        // 🔹 이름은 일단 둘 다 저장해 둔다
-        nameKo: originalName,
-        nameTranslated: translatedName,
-        // 기본 name은 번역 우선, 없으면 한글
-        name: translatedName || originalName,
-        address: p.roadAddress || p.address,
-        lat,
-        lon,
-        categoryKo: originalCategory,
-        categoryTranslated: translatedCategory,
-        category: translatedCategory || originalCategory,
-        rating: p.rating ? Number(p.rating) : 4.0,
-        stay_time: 60,
-        diet_tags: [],
-        categoryType,  // 🔹 식당/카페/기타
-        isFood,        // 🔹 음식 관련 여부
-        _raw: p,
-        _prefs: prefs,
-      };
-    })
-    .filter(Boolean) || [];
+        return {
+          id: idx,
+          // 🔹 이름은 일단 둘 다 저장해 둔다
+          nameKo: originalName,
+          nameTranslated: translatedName,
+          // 기본 name은 번역 우선, 없으면 한글
+          name: translatedName || originalName,
+          address: p.roadAddress || p.address,
+          lat,
+          lon,
+          categoryKo: originalCategory,
+          categoryTranslated: translatedCategory,
+          category: translatedCategory || originalCategory,
+          rating: p.rating ? Number(p.rating) : 4.0,
+          stay_time: 60,
+          diet_tags: [],
+          categoryType,  // 🔹 식당/카페/기타
+          isFood,        // 🔹 음식 관련 여부
+          _raw: p,
+          _prefs: prefs,
+        };
+      })
+      .filter(Boolean) || [];
 
 
 
@@ -759,20 +756,26 @@ export default function App() {
     const maxLegNum = Math.max(5, Number(maxLeg) || 0);
 
     try {
-      // 필수 방문지 + 선택된 POI 합치기
+      // ✅ 수정: 중복 제거 강화
       const allPois = [...selected];
-
-      // 필수 방문지 추가 (중복 제거)
+  
+      // 필수 방문지 추가 (이름 + 좌표로 중복 체크)
       requiredStops.forEach((stop) => {
-        const exists = allPois.some(
-          (p) => p.name === stop.name || p.title === stop.name
-        );
+        const exists = allPois.some((p) => {
+          const nameMatch = (p.name === stop.name) || (p.title === stop.name) || 
+                            (p.nameKo === stop.name) || (p.name === stop.nameKo);
+          const coordMatch = p.lat === stop.lat && p.lon === stop.lon;
+          return nameMatch || coordMatch;
+        });
+        
         if (!exists) {
           allPois.push({
             ...stop,
             categoryType: "required",
             slotType: "required",
           });
+        } else {
+          console.log("⚠️ 중복 제거:", stop.name);
         }
       });
 
@@ -1719,7 +1722,7 @@ const handleSendWish = async () => {
                   </tr>
                 </thead>
                 <tbody>
-  {plan.schedule.map((r) => {
+                {plan.schedule.map((r) => {
     const flags = getPlaceLangFlags(r.name,getActiveLangCodes());
 
     return (
@@ -1826,7 +1829,7 @@ const handleSendWish = async () => {
   })}
 </tbody>
 
-              </table>
+</table>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {t("schedule.none")}
@@ -1857,13 +1860,13 @@ const handleSendWish = async () => {
                               style={{ marginRight: 4 }}
                             >
                               {info.flag}
-                            </span>
+                              </span>
                           ))}
                         </span>
                       )}
                     </b>{" "}
                      —{" "}
-                    {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
+                     {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
                     {(() => {
                       const raw = r.category || "";           // 원본 카테고리 (출발/도착/required/기타)
                       const ko = r.categoryKo || raw;        // 한국어 카테고리
@@ -1942,5 +1945,3 @@ const handleSendWish = async () => {
     </div>
   );
 }
-
-
