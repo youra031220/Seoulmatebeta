@@ -1,3 +1,4 @@
+import ReactCountryFlag from "react-country-flag";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -20,31 +21,33 @@ export default function App() {
   const formatPlaceName = (row) => {
     if (!row) return "";
 
-    // 기본 이름(현재 언어 기준)과 한국어 이름을 분리해서 가져오기
     const base =
-      row.nameTranslated      // Gemini 번역 이름(영어 UI면 보통 영어)
-      || row.name             // 서버에서 온 기본 이름
-      || "";
+      row.nameTranslated ||   // 번역 이름 (영어/일본어 등)
+      row.name ||             // 기본 이름
+      "";
 
-    const ko = row.nameKo || "";  // 한국어 이름(없으면 "")
+    const ko = row.nameKo || ""; // 한국어 이름
 
-    // 1) 한국어 UI일 때는 한국어만 보이게 (필요하면 이 부분도 병기로 바꿀 수 있음)
+    // 1) 한국어 UI → 한국어만 보여주기
     if (currentLang === "ko") {
-      // 한국어가 있으면 한국어, 없으면 base
+      // 한국어 있으면 한국어, 없으면 base
       return ko || base;
     }
 
-    // 2) 둘 중 하나만 있거나, 둘이 같으면 하나만 출력
+    // 2) 외국어 UI (en, ja 등)
+    // 둘 다 없으면 빈 문자열
     if (!base && !ko) return "";
-    if (!ko || ko === base) {
+
+    // 한국어가 없거나, 둘이 같으면 하나만
+    if (!ko || base === ko) {
       return base || ko;
     }
 
-    // 3) 영어 UI(또는 기타 언어)에서는
-    //    "영문이름 (한국어 이름)" 형식으로 출력
-    //    예: "Gyeongbokgung Palace (경복궁)"
+    // 둘 다 있고 다르면: "외국어 (한국어)" 형식
+    // 예: "Gyeongbokgung Palace (경복궁)"
     return `${base} (${ko})`;
   };
+
 
   const formatCategory = (row) => {
     if (!row) return "";
@@ -52,9 +55,9 @@ export default function App() {
     const raw = row.category || "";
 
     // 1) 출발 / 도착 / 필수 방문지 → i18n 키로 번역 (영어만)
-    if (raw === "출발") return t("schedule.category.start");   // 예: "Start"
-    if (raw === "도착") return t("schedule.category.end");     // 예: "End"
-    if (raw === "required") return t("schedule.category.required"); // 예: "Required stop"
+    if (raw === "출발") return t("category.start");   // 수정
+    if (raw === "도착") return t("category.end");     // 수정
+    if (raw === "required") return t("category.required"); // 수정 (required도 일관성 확보)
 
     // 2) 그 외 일반 카테고리: 영어 한 줄만 보이도록
     const tr = row.categoryTranslated || raw;
@@ -488,6 +491,33 @@ export default function App() {
           baseArea: "서울",
           message: travelMessage,
           lang: i18n.language,   // 🔹 ko / en / ja
+          // 🔹 출발지/도착지를 서버로 같이 보냄 (번역용)
+          // 🔹 name이 없으면 title/placeName/address에서 가져와서 채워 넣기
+          startPoint: startPoint
+            ? {
+                ...startPoint,
+                name:
+                  startPoint.name ||
+                  startPoint.title ||
+                  startPoint.placeName ||
+                  startPoint.roadAddress ||
+                  startPoint.address ||
+                  "",
+              }
+            : null,
+
+          endPoint: endPoint
+            ? {
+                ...endPoint,
+                name:
+                  endPoint.name ||
+                  endPoint.title ||
+                  endPoint.placeName ||
+                  endPoint.roadAddress ||
+                  endPoint.address ||
+                  "",
+              }
+          : null,
           context: {
             breakfast,
             lunch,
@@ -513,7 +543,16 @@ export default function App() {
       }
 
       const data = await res.json();
-      const { prefs, pois, weights: weightsFromServer, biasReport } = data || {};
+      const {
+        prefs,
+        pois,
+        weights: weightsFromServer,
+        biasReport,
+        // 🔹 백엔드에서 번역해서 보내준 출발지/도착지/필수 방문지
+        startPoint: serverStartPoint,
+        endPoint: serverEndPoint,
+        requiredStops: serverRequiredStops,
+      } = data || {};
       
       // weights 저장 (체류시간 계산용)
       if (weightsFromServer) {
@@ -534,6 +573,55 @@ export default function App() {
           },
         ]);
       }
+
+      // 🔹  출발지 / 도착지 / 필수 방문지에 번역 정보 반영
+      if (serverStartPoint) {
+        setStartPoint((prev) => {
+          const base = prev || {}; // 기존에 LocationSearch에서 선택한 값
+
+          return {
+            // 1) 기존 값 유지
+            ...base,
+            // 2) 백엔드에서 온 번역 필드로 덮어쓰기
+            ...serverStartPoint,
+            // 3) 좌표는 기존 값 우선
+            lat: base.lat ?? serverStartPoint.lat ?? null,
+            lon: base.lon ?? serverStartPoint.lon ?? null,
+          };
+        });
+      }
+
+      if (serverEndPoint) {
+        setEndPoint((prev) => {
+          const base = prev || {};
+
+          return {
+            ...base,
+            ...serverEndPoint,
+            lat: base.lat ?? serverEndPoint.lat ?? null,
+            lon: base.lon ?? serverEndPoint.lon ?? null,
+          };
+        });
+      }
+
+      if (Array.isArray(serverRequiredStops) && serverRequiredStops.length) {
+        setRequiredStops((prev) => {
+          if (!prev || !prev.length) return prev;
+
+          return prev.map((stop, idx) => {
+            const tStop = serverRequiredStops[idx];
+            if (!tStop) return stop;
+
+            return {
+              ...stop,
+              ...tStop,
+              lat: stop.lat ?? tStop.lat ?? null,
+              lon: stop.lon ?? tStop.lon ?? null,
+            };
+          });
+        });
+      }
+
 
       // Naver local API raw → routePlanner용 형식으로 변환
       const converted =
@@ -758,6 +846,7 @@ export default function App() {
 
     try {
       // ✅ 수정: 중복 제거 강화
+
           // ✅ 사용자가 선택한 POI는 모두 "무조건 포함" 플래그를 달아서 보낸다
     const allPois = selected.map((p) => ({
       ...p,
@@ -784,8 +873,10 @@ export default function App() {
       );
       // ✅ 디버깅 로그
       console.log("🗺️ 경로 최적화 결과:", { routeArray: opt.routeArray?.length, route: opt.route });
+
       // 시간별 일정 생성
       const schedule = generateSchedule(
+
         opt.routeArray,
         opt.route,
         opt.waits,
@@ -803,10 +894,13 @@ export default function App() {
           nameTranslated: endPoint?.nameTranslated ?? "",
         }
       );
+
       // ✅ 디버깅 로그
       console.log("📅 생성된 일정:", schedule?.length, schedule);
+
       setPlan({ ...opt, schedule });
       setStatusKey("status.success");
+
 
     } catch (e) {
       console.error(e);
@@ -1847,20 +1941,27 @@ const handleSendWish = async () => {
             : r.nameTranslated && r.nameTranslated !== (r.nameKo || r.name)
             ? `${r.nameTranslated} (${r.nameKo || r.name})` // 예: Gyeongbokgung Palace (경복궁)
             : (r.nameKo || r.name)}
+
           {flags.length > 0 && (
             <span style={{ marginLeft: 6 }}>
               {flags.map((info) => (
-                <span
+                <ReactCountryFlag
                   key={info.code}
+                  countryCode={info.countryCode}    // "KR", "US" ...
+                  svg
                   title={info.label}
-                  style={{ marginRight: 4 }}
-                >
-                  {info.flag}
-                </span>
+                  style={{
+                    width: "1em",
+                    height: "1em",
+                    marginRight: 4,
+                    verticalAlign: "middle",
+                  }}
+                />
               ))}
             </span>
           )}
         </td>
+        <td style={{ padding: "4px 0" }}>{formatCategory(r)}</td>
         {/* 🔹 카테고리: 번역 + / + 한국어 */}
         <td style={{ padding: "4px 0" }}>
           {(() => {
@@ -1966,16 +2067,23 @@ const handleSendWish = async () => {
                       {r.order}. {formatPlaceName(r)}
                       {flags.length > 0 && (
                         <span style={{ marginLeft: 6 }}>
-                          {flags.map((info) => (
-                            <span
-                              key={info.code}
-                              title={info.label}
-                              style={{ marginRight: 4 }}
-                            >
-                              {info.flag}
-                              </span>
-                          ))}
-                        </span>
+
+                         {flags.map((info) => (
+                            <ReactCountryFlag
+                            key={info.code}
+                            countryCode={info.countryCode}
+                            svg
+                            title={info.label}
+                            style={{
+                              width: "1em",
+                              height: "1em",
+                              marginRight: 4,
+                              verticalAlign: "middle",
+                            }}
+                          />
+                        ))}
+                      </span>
+
                       )}
                     </b>{" "}
                      —{" "}
@@ -2057,6 +2165,7 @@ const handleSendWish = async () => {
       </div>
     </div>
   );
+
 }
 
 

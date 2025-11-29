@@ -645,6 +645,7 @@ app.post("/api/search-with-pref", async (req, res) => {
       message = "",
       context = {},
       startPoint: bodyStartPoint,
+      endPoint: bodyEndPoint,   // 🔹 추가
       lang = "ko",  // 🔹 추가: 프론트에서 넘겨줄 언어 코드
     } = req.body || {};
 
@@ -797,14 +798,153 @@ app.post("/api/search-with-pref", async (req, res) => {
     }
 
     // 🔤 언어에 맞춰 장소명/카테고리 번역 (ko 이면 생략)
+    //    → scoredPOIs + 출발지 + 도착지 + 필수 방문지를 한 번에 번역
     let poisForClient = scoredPOIs;
+
+    // 1) 번역 대상이 될 앵커(출발/도착/필수) 정리
+    const startForTranslate = bodyStartPoint || context?.startPoint || null;
+    const endForTranslate = bodyEndPoint || context?.endPoint || null;
+    const requiredRaw = Array.isArray(context?.requiredStops)
+      ? context.requiredStops
+      : [];
+
+    // 번역 후 다시 되돌리기 위한 메타 정보
+    const anchorMeta = [];
+    const anchorItems = [];
+
+    const pushAnchor = (kind, src, extra = {}) => {
+      if (!src) return;
+
+      // name이 없으면 title / placeName / address 순서로 사용
+      const rawTitle =
+        src.name ||
+        src.title ||
+        src.placeName ||
+        src.roadAddress ||
+        src.address ||
+        "";
+
+      const title = String(rawTitle).replace(/<[^>]+>/g, "").trim();
+      if (!title) return;
+
+      anchorMeta.push({ kind, index: extra.index ?? null });
+
+      // translatePoisForLanguage가 쓰는 최소 필드만 전달
+      anchorItems.push({
+        title,
+        category: extra.category || "anchor",
+      });
+    };
+
+    // 출발 / 도착 / 필수 방문지를 번역 리스트에 추가
+    pushAnchor("start", startForTranslate, { category: "출발" });
+    pushAnchor("end", endForTranslate, { category: "도착" });
+    requiredRaw.forEach((r, idx) =>
+      pushAnchor("required", r, { category: "required", index: idx })
+    );
+
+    // 번역 결과를 담아둘 객체들(초기값은 원본 복사)
+    let translatedStart = startForTranslate ? { ...startForTranslate } : null;
+    let translatedEnd = endForTranslate ? { ...endForTranslate } : null;
+    const translatedRequired = requiredRaw.map((r) => (r ? { ...r } : r));
+
     try {
-      poisForClient = await translatePoisForLanguage(scoredPOIs, lang);
+      if (lang && lang !== "ko") {
+        // 2) scoredPOIs + 앵커를 한 번에 번역
+        const allInput = [...scoredPOIs, ...anchorItems];
+        const allTranslated = await translatePoisForLanguage(allInput, lang);
+
+        // 앞쪽 N개는 POI, 뒤쪽은 앵커들
+        const poisTranslated = allTranslated.slice(0, scoredPOIs.length);
+        const anchorsTranslated = allTranslated.slice(scoredPOIs.length);
+
+        poisForClient = poisTranslated;
+
+        // 3) 앵커 번역 결과를 다시 start/end/requiredStops 구조에 합치기
+        anchorsTranslated.forEach((item, idx) => {
+          const meta = anchorMeta[idx];
+          if (!meta) return;
+
+          const originalTitle = String(item.title || item.name || "")
+            .replace(/<[^>]+>/g, "")
+            .trim();
+          const translatedTitle = String(item.titleTranslated || "")
+            .replace(/<[^>]+>/g, "")
+            .trim();
+
+          if (meta.kind === "start" && translatedStart) {
+            translatedStart = {
+              ...translatedStart,
+              // 기본 name은 "번역이름 또는 한글"
+              name: translatedTitle || originalTitle,
+              nameKo: originalTitle,
+              nameTranslated: translatedTitle || "",
+            };
+          } else if (meta.kind === "end" && translatedEnd) {
+            translatedEnd = {
+              ...translatedEnd,
+              name: translatedTitle || originalTitle,
+              nameKo: originalTitle,
+              nameTranslated: translatedTitle || "",
+            };
+          } else if (meta.kind === "required" && meta.index != null) {
+            const prev = translatedRequired[meta.index];
+            if (!prev) return;
+            translatedRequired[meta.index] = {
+              ...prev,
+              name: translatedTitle || originalTitle,
+              nameKo: originalTitle,
+              nameTranslated: translatedTitle || "",
+            };
+          }
+        });
+      } else {
+        // lang === "ko" 인 경우: 번역 호출 없이 필드만 정리
+        if (translatedStart?.name) {
+          const title = String(translatedStart.name).trim();
+          translatedStart = {
+            ...translatedStart,
+            name: title,
+            nameKo: title,
+            nameTranslated: "",
+          };
+        }
+        if (translatedEnd?.name) {
+          const title = String(translatedEnd.name).trim();
+          translatedEnd = {
+            ...translatedEnd,
+            name: title,
+            nameKo: title,
+            nameTranslated: "",
+          };
+        }
+        requiredRaw.forEach((r, idx) => {
+          if (!r || !r.name) return;
+          const title = String(r.name).trim();
+          translatedRequired[idx] = {
+            ...r,
+            name: title,
+            nameKo: title,
+            nameTranslated: "",
+          };
+        });
+      }
     } catch (e) {
-      console.warn("⚠️ POI 번역 실패, 원본 그대로 사용:", e?.message || e);
+      console.warn("⚠️ 장소 번역 실패, 원본 그대로 사용:", e?.message || e);
     }
 
-    return res.json({ prefs: safePrefs, weights, city, pois: poisForClient, biasReport });
+    // 4) 응답에 번역된 start/end/requiredStops 를 같이 내려주기
+    return res.json({
+      prefs: safePrefs,
+      weights,
+      city,
+      pois: poisForClient,
+      biasReport,
+      startPoint: translatedStart,
+      endPoint: translatedEnd,
+      requiredStops: translatedRequired,
+    });
+
   } catch (error) {
     console.error("❌ /api/search-with-pref 처리 실패:", error?.message || error);
     return res
