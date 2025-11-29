@@ -1,18 +1,12 @@
 // agents/scoringAgent.js
-// POI(장소) 점수 계산 모듈
+// POI(장소) 점수 계산 모듈 - 정규화된 가중치 버전
 
 // ===================== 상수 & 헬퍼 =====================
 const EARTH_RADIUS_KM = 6371;
 const DEFAULT_RATING = 3.5;
-const RATING_SCALE = 4; // 평점을 0~4 범위로 환산
-const SCORE_BASELINE = 5;
 const SCORE_MIN = 0;
 const SCORE_MAX = 10;
-const DISTANCE_PENALTY_MIN = -4;
-const DISTANCE_PENALTY_MAX = 2;
 const DEFAULT_PRICE_LEVEL = 2;
-const PRICE_MIN_LEVEL = 1;
-const PRICE_MAX_LEVEL = 3;
 
 function normalizeNumber(value, fallback = 0) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -27,43 +21,40 @@ function normalizeNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function clampNumber(value, min, max, fallback = min) {
-  if (!Number.isFinite(value)) return fallback;
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * 좌표 정규화 - lng/lon 키 불일치 문제 해결
+ */
+function normalizeCoord(point) {
+  if (!point || typeof point !== "object") return null;
+  
+  const lat = parseFloat(point.lat ?? point.mapy);
+  const lng = parseFloat(point.lng ?? point.lon ?? point.mapx);
+  
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+  
+  return { lat, lng };
 }
 
 /**
  * Haversine 거리 계산 (km 단위)
- * point = { lat, lng }
  */
 export function calculateDistance(point1, point2) {
-  if (!point1 || !point2 || typeof point1 !== "object" || typeof point2 !== "object") {
-    return null;
-  }
+  const p1 = normalizeCoord(point1);
+  const p2 = normalizeCoord(point2);
+  
+  if (!p1 || !p2) return null;
 
-  const lat1 = parseFloat(point1.lat);
-  const lon1 = parseFloat(point1.lng);
-  const lat2 = parseFloat(point2.lat);
-  const lon2 = parseFloat(point2.lng);
-
-  if (
-    Number.isNaN(lat1) ||
-    Number.isNaN(lon1) ||
-    Number.isNaN(lat2) ||
-    Number.isNaN(lon2)
-  ) {
-    return null;
-  }
-
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const dLat = ((p2.lat - p1.lat) * Math.PI) / 180;
+  const dLon = ((p2.lng - p1.lng) * Math.PI) / 180;
 
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
+    Math.cos((p1.lat * Math.PI) / 180) *
+      Math.cos((p2.lat * Math.PI) / 180) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
 
@@ -76,7 +67,7 @@ export function calculateDistance(point1, point2) {
  */
 function buildPoiText(poi) {
   if (!poi || typeof poi !== "object") return "";
-  const title = poi.title || "";
+  const title = poi.title || poi.name || "";
   const category = poi.category || "";
   const description = poi.description || "";
   return `${title} ${category} ${description}`.toLowerCase();
@@ -84,313 +75,297 @@ function buildPoiText(poi) {
 
 /**
  * POI의 가격 수준 추정 (1: low, 2: mid, 3: high)
- * 정보가 없으면 2(mid)로 가정
  */
 export function estimatePriceLevel(poi) {
   if (!poi || typeof poi !== "object") return DEFAULT_PRICE_LEVEL;
 
-  try {
-    const text = buildPoiText(poi);
+  const text = buildPoiText(poi);
 
-    // 아주 대충 키워드 기반으로 추정
-    if (/고급|프리미엄|파인 다이닝|호텔|스테이크|오마카세|코스요리/.test(text)) {
-      return PRICE_MAX_LEVEL;
-    }
-    if (/뷔페|레스토랑|브런치|디저트|카페|바|펍/.test(text)) {
-      return DEFAULT_PRICE_LEVEL;
-    }
-    if (/분식|포장마차|포차|노포|시장|포장/.test(text)) {
-      return PRICE_MIN_LEVEL;
-    }
-  } catch (error) {
-    console.warn("⚠️ estimatePriceLevel: 예기치 못한 입력", error);
+  if (/고급|프리미엄|파인 다이닝|호텔|스테이크|오마카세|코스요리/.test(text)) {
+    return 3;
+  }
+  if (/뷔페|레스토랑|브런치|디저트|카페|바|펍/.test(text)) {
+    return 2;
+  }
+  if (/분식|포장마차|포차|노포|시장|포장/.test(text)) {
+    return 1;
   }
 
-  // 정보가 거의 없으면 중간
   return DEFAULT_PRICE_LEVEL;
 }
 
 /**
- * 태그 매칭 (예: "야경", "인스타 감성" 등)
+ * 태그 매칭
  */
 export function checkTagMatch(poi, tag) {
   if (!poi || typeof poi !== "object" || !tag) return false;
-
   const target = buildPoiText(poi);
   const t = String(tag).toLowerCase();
   return target.includes(t);
 }
 
 /**
- * 회피 대상 매칭 (예: "비싼 레스토랑", "사람 많은 곳")
- * - 아주 러프하게 키워드 단위로만 체크
+ * 회피 대상 매칭
  */
-export function checkAvoidMatch(poi, avoidItem, prefs) {
+export function checkAvoidMatch(poi, avoidItem) {
   if (!poi || typeof poi !== "object" || !avoidItem) return false;
 
   const target = buildPoiText(poi);
   const a = String(avoidItem).toLowerCase();
 
-  // "비싼", "고급" 관련
   if (/비싼|비싸|고급|프리미엄/.test(a)) {
     if (/고급|프리미엄|파인 다이닝|호텔|오마카세|스테이크/.test(target)) {
       return true;
     }
   }
 
-  // "사람 많은 곳", "복잡한 곳" 등
   if (/사람 많은|복잡한|붐비는/.test(a)) {
     if (/핫플|핫 플레이스|인기|대기|줄 서는/.test(target)) {
       return true;
     }
   }
 
-  // 기본: 단순 포함 여부
   return target.includes(a);
 }
 
 /**
- * 개별 POI 스코어링
+ * 개별 POI 스코어링 (정규화된 가중치 사용)
+ * 
  * @param {Object} poi - 장소 객체
  * @param {Object} prefs - 여행 취향
- * @param {Object} weights - weightAgent가 만든 가중치
- * @param {Object} startPoint - { lat, lng } 시작점(예: 숙소/출발지)
- * @param {Object} anchor - { lat, lon, category, rating } 앵커 장소 (옵셔널, refine API용)
+ * @param {Object} weights - 정규화된 가중치 (generateWeights 결과)
+ * @param {Object} startPoint - 시작점 { lat, lng }
+ * @param {Object} anchor - 앵커 장소 (옵션, refine API용)
  * @returns {Object} 점수 정보가 포함된 poi
  */
 export function scorePOI(poi, prefs, weights, startPoint, anchor = null) {
   if (!poi || typeof poi !== "object") return poi;
 
-  // 0. 안전장치
+  // 안전장치
   weights = weights || {};
   prefs = prefs || {};
-  // 예시) 정보 거의 없는 POI는 약 5점, 취향/가중치가 잘 맞으면 8~9점대까지 상승.
-
+  
+  const scoreW = weights.scoreWeights || {
+    base: 0.15, distance: 0.20, budget: 0.15,
+    theme: 0.25, category: 0.10, diet: 0.10, pace: 0.05
+  };
   const budgetW = weights.budget || {};
   const paceW = weights.pace || {};
   const themeW = weights.theme || {};
   const catW = weights.category || {};
   const dietW = weights.diet || {};
 
-  // 1. 기본 점수: 평점 기반 (정보 없으면 DEFAULT_RATING 사용)
-  const ratingRaw =
-    poi.rating ?? poi.userRating ?? poi.user_score ?? poi.score ?? DEFAULT_RATING;
+  // ============================================
+  // 1. 기본 점수 (평점 기반, 0~1 정규화)
+  // ============================================
+  const ratingRaw = poi.rating ?? poi.userRating ?? poi.user_score ?? poi.score ?? DEFAULT_RATING;
   const rating = normalizeNumber(ratingRaw, DEFAULT_RATING);
-  let baseScore = (rating / 5) * RATING_SCALE; // 0~4
+  const baseScore = rating / 5; // 0~1
 
-  // 2. 거리 페널티 (시작점 기준 직선거리)
+  // ============================================
+  // 2. 거리 점수 (가까울수록 높음, 0~1)
+  // ============================================
+  let distanceScore = 0.5; // 기본값 (정보 없을 때)
   let distanceKm = null;
-  let distanceScore = 0;
+  
+  const poiCoord = normalizeCoord(poi);
+  const startCoord = normalizeCoord(startPoint);
 
-  let poiPoint = null;
-  if (poi.lat && poi.lng) {
-    poiPoint = { lat: poi.lat, lng: poi.lng };
-  } else if (poi.mapy && poi.mapx) {
-    poiPoint = { lat: poi.mapy, lng: poi.mapx };
-  }
-
-  if (startPoint && poiPoint) {
-    distanceKm = calculateDistance(startPoint, poiPoint);
+  if (poiCoord && startCoord) {
+    distanceKm = calculateDistance(startCoord, poiCoord);
     if (distanceKm != null) {
-      // pace.distanceWeight는 보통 음수
-      const safeDistanceKm = normalizeNumber(distanceKm, 0);
-      let distanceWeight = normalizeNumber(paceW.distanceWeight, 0);
+      // 5km 이내면 1.0, 20km 이상이면 0.0 (선형 감소)
+      distanceScore = clamp(1 - (distanceKm / 20), 0, 1);
       
-      // C. 테마 매칭 시 거리 페널티 50% 감소
-      let hasThemeMatch = false;
-      if (Array.isArray(prefs.themes) && prefs.themes.length > 0) {
-        hasThemeMatch = prefs.themes.some((theme) => checkTagMatch(poi, theme));
-      }
-      if (Array.isArray(prefs.poiTags) && prefs.poiTags.length > 0) {
-        hasThemeMatch = hasThemeMatch || prefs.poiTags.some((tag) => checkTagMatch(poi, tag));
-      }
-      
+      // 테마 매칭 시 거리 페널티 50% 감소
+      const hasThemeMatch = (prefs.themes || []).some(t => checkTagMatch(poi, t)) ||
+                           (prefs.poiTags || []).some(t => checkTagMatch(poi, t));
       if (hasThemeMatch) {
-        distanceWeight = distanceWeight * 0.5; // 거리 페널티 50% 감소
+        distanceScore = 0.5 + distanceScore * 0.5; // 최소 0.5 보장
       }
-      
-      distanceScore = safeDistanceKm * distanceWeight;
-      // 너무 과하게 깎이지 않도록 최소/최대 제한
-      distanceScore = clampNumber(
-        distanceScore,
-        DISTANCE_PENALTY_MIN,
-        DISTANCE_PENALTY_MAX,
-        0
-      );
     }
   }
 
-  // 3. 예산 점수
-  let budgetScore = 0;
+  // ============================================
+  // 3. 예산 점수 (매칭도, 0~1)
+  // ============================================
   const budgetLevel = prefs.budgetLevel || "mid";
   const budgetMap = { low: 1, mid: 2, high: 3 };
-  const userBudget = budgetMap[budgetLevel] || DEFAULT_PRICE_LEVEL;
-  const poiPriceLevel = estimatePriceLevel(poi); // 1~3
-
-  const diff = poiPriceLevel - userBudget;
-
-  // 가격이 사용자의 선호보다 높으면 페널티, 낮으면 valueBonus
-  if (diff > 0) {
-    budgetScore += normalizeNumber(budgetW.priceWeight, 0) * diff; // 보통 음수
-  } else if (diff < 0) {
-    budgetScore += normalizeNumber(budgetW.valueBonus, 0) * Math.abs(diff);
+  const userBudget = budgetMap[budgetLevel] || 2;
+  const poiPriceLevel = estimatePriceLevel(poi);
+  
+  let budgetScore = 0.5;
+  const priceDiff = Math.abs(poiPriceLevel - userBudget);
+  
+  if (priceDiff === 0) {
+    budgetScore = 1.0; // 완벽 매칭
+  } else if (priceDiff === 1) {
+    budgetScore = 0.6; // 근접
+  } else {
+    budgetScore = 0.2; // 불일치
   }
 
-  // 고급 선호(high) + 고급 장소면 보너스
+  // 가성비 보너스 (low budget + low price)
+  if (budgetLevel === "low" && poiPriceLevel === 1) {
+    budgetScore = Math.min(1.0, budgetScore + normalizeNumber(budgetW.valueBonus, 0) * 0.3);
+  }
+  // 럭셔리 보너스 (high budget + high price)
   if (budgetLevel === "high" && poiPriceLevel === 3) {
-    budgetScore += normalizeNumber(budgetW.luxuryBonus, 0);
+    budgetScore = Math.min(1.0, budgetScore + normalizeNumber(budgetW.luxuryBonus, 0) * 0.3);
   }
 
-  // 4. 테마/태그 매칭 점수
+  // ============================================
+  // 4. 테마/태그 점수 (매칭 수 기반, 0~1)
+  // ============================================
   let themeScore = 0;
+  let themeMatches = 0;
+  let tagMatches = 0;
+  let avoidMatches = 0;
 
   if (Array.isArray(prefs.themes)) {
-    prefs.themes.forEach((theme) => {
-      if (checkTagMatch(poi, theme)) {
-        themeScore += normalizeNumber(themeW.themeMatchBonus, 0);
-      }
+    prefs.themes.forEach(theme => {
+      if (checkTagMatch(poi, theme)) themeMatches++;
     });
   }
 
   if (Array.isArray(prefs.poiTags)) {
-    prefs.poiTags.forEach((tag) => {
-      if (checkTagMatch(poi, tag)) {
-        themeScore += normalizeNumber(themeW.tagMatchBonus, 0);
-      }
+    prefs.poiTags.forEach(tag => {
+      if (checkTagMatch(poi, tag)) tagMatches++;
     });
   }
 
   if (Array.isArray(prefs.mustAvoid)) {
-    prefs.mustAvoid.forEach((avoidItem) => {
-      if (checkAvoidMatch(poi, avoidItem, prefs)) {
-        themeScore += normalizeNumber(themeW.avoidPenalty, 0); // 보통 음수
-      }
+    prefs.mustAvoid.forEach(avoid => {
+      if (checkAvoidMatch(poi, avoid)) avoidMatches++;
     });
   }
 
-  // 5. 카테고리 가중치
-  let categoryScore = 0;
-  const type = poi.categoryType || "poi";
+  // 테마 점수 계산 (0~1)
+  const totalPossibleMatches = (prefs.themes?.length || 0) + (prefs.poiTags?.length || 0);
+  if (totalPossibleMatches > 0) {
+    const positiveMatches = themeMatches + tagMatches;
+    themeScore = positiveMatches / totalPossibleMatches;
+  }
+  
+  // 회피 대상이면 페널티
+  if (avoidMatches > 0) {
+    themeScore = Math.max(0, themeScore - 0.5);
+  }
 
-  if (type === "restaurant") {
-    categoryScore += normalizeNumber(catW.restaurantWeight, 0);
-  } else if (type === "cafe") {
-    categoryScore += normalizeNumber(catW.cafeWeight, 0);
+  // ============================================
+  // 5. 카테고리 점수 (0~1)
+  // ============================================
+  const categoryType = poi.categoryType || "poi";
+  let categoryScore = 0.5;
+
+  if (categoryType === "restaurant") {
+    categoryScore = normalizeNumber(catW.restaurantWeight, 0.33);
+  } else if (categoryType === "cafe") {
+    categoryScore = normalizeNumber(catW.cafeWeight, 0.33);
   } else {
-    // 일반 POI (관광지 등)
-    categoryScore += normalizeNumber(catW.poiWeight, 0);
+    categoryScore = normalizeNumber(catW.poiWeight, 0.34);
   }
 
-  // 6. 식단 선호도 (채식, 비건, 할랄 등)
-  let dietScore = 0;
+  // ============================================
+  // 6. 식단 점수 (0~1)
+  // ============================================
+  let dietScore = 0.5; // 기본값
   const dietPrefs = prefs.dietPreferences || [];
-  if (Array.isArray(dietPrefs) && dietPrefs.length > 0) {
+  
+  if (dietPrefs.length > 0) {
     const poiText = buildPoiText(poi);
+    let dietMatches = 0;
 
-    dietPrefs.forEach((d) => {
+    dietPrefs.forEach(d => {
       const k = String(d).toLowerCase();
-      // 아주 러프하게 키워드 매칭
-      if (k.includes("vegan") || k === "vegan") {
-        if (/비건|vegan/.test(poiText)) {
-          dietScore += normalizeNumber(dietW.dietMatchBonus, 0);
-        }
-      } else if (k.includes("vegetarian")) {
-        if (/채식|베지|vegetarian/.test(poiText)) {
-          dietScore += normalizeNumber(dietW.dietMatchBonus, 0);
-        }
-      } else if (k.includes("halal")) {
-        if (/할랄|halal/.test(poiText)) {
-          dietScore += normalizeNumber(dietW.dietMatchBonus, 0);
-        }
-      } else {
-        // 기타는 이름 포함 정도만
-        if (poiText.includes(k)) {
-          dietScore += normalizeNumber(dietW.dietMatchBonus, 0);
-        }
+      if ((k.includes("vegan") || k === "vegan") && /비건|vegan/.test(poiText)) {
+        dietMatches++;
+      } else if (k.includes("vegetarian") && /채식|베지|vegetarian/.test(poiText)) {
+        dietMatches++;
+      } else if (k.includes("halal") && /할랄|halal/.test(poiText)) {
+        dietMatches++;
+      } else if (poiText.includes(k)) {
+        dietMatches++;
       }
     });
+
+    dietScore = dietMatches > 0 ? 1.0 : 0.2;
   }
 
-  // 7. 페이스가 relaxed일 때, 공원/산책/한적 같은 키워드 있으면 보너스
-  let paceRelaxScore = 0;
+  // ============================================
+  // 7. 페이스 점수 (relaxed 선호 장소 매칭, 0~1)
+  // ============================================
+  let paceScore = 0.5;
+  
   if ((prefs.pace || "normal") === "relaxed") {
     const poiText = buildPoiText(poi);
     if (/공원|산책|한적|조용|산책로|호숫가|강변|정원/.test(poiText)) {
-      paceRelaxScore += normalizeNumber(paceW.relaxationBonus, 0);
+      paceScore = 1.0;
     }
   }
 
-  // 8. 앵커 기반 유사도 점수 (refine API용)
-  let anchorScore = 0;
-  if (anchor && anchor.lat && anchor.lon && poiPoint) {
-    // 앵커와의 거리 계산 (가까울수록 높은 점수)
-    const anchorPoint = { lat: anchor.lat, lng: anchor.lon };
-    const anchorDistanceKm = calculateDistance(anchorPoint, poiPoint);
+  // ============================================
+  // 8. 앵커 기반 유사도 보너스 (refine API용)
+  // ============================================
+  let anchorBonus = 0;
+  if (anchor && anchor.lat && anchor.lon && poiCoord) {
+    const anchorCoord = normalizeCoord(anchor);
+    const anchorDist = calculateDistance(anchorCoord, poiCoord);
     
-    if (anchorDistanceKm != null && anchorDistanceKm <= 5) {
-      // 5km 이내면 거리 기반 보너스 (가까울수록 높음)
-      const distanceBonus = Math.max(0, (5 - anchorDistanceKm) / 5) * 0.5; // 최대 0.5점
-      anchorScore += distanceBonus;
+    if (anchorDist != null && anchorDist <= 5) {
+      anchorBonus += (5 - anchorDist) / 5 * 0.1; // 최대 0.1
     }
     
-    // 카테고리 유사도 보너스
     const poiCategory = poi.categoryType || poi.category || "";
     const anchorCategory = anchor.category || anchor.categoryType || "";
     if (poiCategory === anchorCategory) {
-      anchorScore += 0.3; // 같은 카테고리면 보너스
-    }
-    
-    // 평점 유사도 보너스
-    const anchorRating = normalizeNumber(anchor.rating, 0);
-    const poiRating = normalizeNumber(poi.rating, DEFAULT_RATING);
-    if (Math.abs(anchorRating - poiRating) <= 0.5) {
-      anchorScore += 0.2; // 평점이 비슷하면 보너스
+      anchorBonus += 0.05;
     }
   }
 
-  // 9. 전체 합산 후 0~10으로 정규화
-  let totalScore =
-    SCORE_BASELINE + // 기준점
-    baseScore +
-    distanceScore +
-    budgetScore +
-    themeScore +
-    categoryScore +
-    dietScore +
-    paceRelaxScore +
-    anchorScore;
+  // ============================================
+  // 9. 최종 점수 계산 (가중 평균, 0~10)
+  // ============================================
+  const weightedScore = 
+    scoreW.base * baseScore +
+    scoreW.distance * distanceScore +
+    scoreW.budget * budgetScore +
+    scoreW.theme * themeScore +
+    scoreW.category * categoryScore +
+    scoreW.diet * dietScore +
+    scoreW.pace * paceScore +
+    anchorBonus;
 
-  const safeTotalScore = clampNumber(totalScore, SCORE_MIN, SCORE_MAX, SCORE_MIN);
+  // 0~1을 0~10으로 변환
+  const finalScore = clamp(weightedScore * 10, SCORE_MIN, SCORE_MAX);
 
   return {
     ...poi,
-    _score: safeTotalScore,
+    _score: finalScore,
     _debugScore: {
-      baseScore,
-      distanceScore,
-      budgetScore,
-      themeScore,
-      categoryScore,
-      dietScore,
-      paceRelaxScore,
-      distanceKm,
+      baseScore: (baseScore * 10).toFixed(2),
+      distanceScore: (distanceScore * 10).toFixed(2),
+      budgetScore: (budgetScore * 10).toFixed(2),
+      themeScore: (themeScore * 10).toFixed(2),
+      categoryScore: (categoryScore * 10).toFixed(2),
+      dietScore: (dietScore * 10).toFixed(2),
+      paceScore: (paceScore * 10).toFixed(2),
+      anchorBonus: (anchorBonus * 10).toFixed(2),
+      distanceKm: distanceKm?.toFixed(2) || null,
+      themeMatches,
+      tagMatches,
+      avoidMatches,
     },
   };
 }
 
 /**
  * POI 리스트 스코어링 + 정렬
- * @param {Array} pois - POI 배열
- * @param {Object} prefs - 여행 취향
- * @param {Object} weights - 가중치
- * @param {Object} startPoint - 시작점
- * @param {Object} anchor - 앵커 장소 (옵셔널, refine API용)
- * @returns {Array} 점수화된 POI 배열 (정렬됨)
  */
 export function scorePOIs(pois, prefs, weights, startPoint, anchor = null) {
   if (!Array.isArray(pois)) return [];
 
-  const scored = pois.map((poi) =>
+  const scored = pois.map(poi =>
     scorePOI(poi, prefs || {}, weights || {}, startPoint, anchor)
   );
 
@@ -402,4 +377,29 @@ export function scorePOIs(pois, prefs, weights, startPoint, anchor = null) {
   });
 
   return scored;
+}
+
+/**
+ * POI를 카테고리별로 분류
+ */
+export function categorizePOIs(pois) {
+  const result = {
+    attractions: [],  // 관광지
+    restaurants: [],  // 식당
+    cafes: [],        // 카페
+  };
+
+  for (const poi of pois) {
+    const type = poi.categoryType || "poi";
+    
+    if (type === "restaurant") {
+      result.restaurants.push(poi);
+    } else if (type === "cafe") {
+      result.cafes.push(poi);
+    } else {
+      result.attractions.push(poi);
+    }
+  }
+
+  return result;
 }

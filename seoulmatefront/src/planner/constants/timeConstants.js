@@ -1,7 +1,9 @@
 // Meal time windows
 export const MEAL_WINDOWS = {
+  breakfast: { start: "07:30", end: "09:30" },
   lunch: { start: "11:30", end: "13:30" },
-  dinner: { start: "17:30", end: "19:30" }
+  dinner: { start: "17:30", end: "19:30" },
+  cafe: { start: "14:00", end: "16:00" }
 };
 
 // Stay time by category (in minutes)

@@ -102,6 +102,10 @@ const resources = {
 
       "specifics.title": "장소 세부정보",
       "specifics.none": "생성된 일정이 없어서 장소 정보를 불러올 수 없습니다.",
+
+      "category.start": "출발",
+      "category.end": "도착",
+      "category.required": "필수 방문지",
     },
   },
 
@@ -304,6 +308,10 @@ const resources = {
       "specifics.title": "スポット詳細",
       "specifics.none":
         "スケジュールがまだ作成されていないため、スポット情報を取得できません。",
+
+      "category.start": "出発",
+      "category.end": "到着",
+      "category.required": "必須スポット",
     },
   },
 
@@ -405,6 +413,10 @@ const resources = {
       "specifics.title": "地点详细信息",
       "specifics.none":
         "目前尚未生成行程，因此无法显示地点的详细信息。",
+
+      "schedule.category.start": "出发",
+      "schedule.category.end": "到达",
+      "schedule.category.required": "必去景点",
     },
   },
 
@@ -509,6 +521,10 @@ const resources = {
       "specifics.title": "地點詳細資訊",
       "specifics.none":
         "目前尚未產生行程，因此無法顯示地點資訊。",
+
+      "schedule.category.start": "出發",
+      "schedule.category.end": "抵達",
+      "schedule.category.required": "必去景點",
     },
   },
 
@@ -617,6 +633,10 @@ const resources = {
       "specifics.title": "Chi tiết địa điểm",
       "specifics.none":
         "Chưa có lịch trình nên chưa thể hiển thị thông tin địa điểm.",
+
+      "schedule.category.start": "Khởi hành",
+      "schedule.category.end": "Kết thúc",
+      "schedule.category.required": "Điểm bắt buộc",
     },
   },
 
@@ -723,6 +743,10 @@ const resources = {
       "specifics.title": "รายละเอียดสถานที่",
       "specifics.none":
         "ยังไม่มีตารางทริป จึงไม่สามารถแสดงข้อมูลสถานที่ได้ในตอนนี้",
+
+      "schedule.category.start": "ออกเดินทาง",
+      "schedule.category.end": "สิ้นสุด",
+      "schedule.category.required": "จุดที่ต้องไป",
     },
   },
 
@@ -830,6 +854,10 @@ const resources = {
       "specifics.title": "Detail tempat",
       "specifics.none":
         "Belum ada jadwal, jadi detail tempat belum tersedia.",
+
+      "schedule.category.start": "Mulai",
+      "schedule.category.end": "Selesai",
+      "schedule.category.required": "Tempat wajib",
     },
   },
 
@@ -944,6 +972,10 @@ const resources = {
       "specifics.title": "Detalles del lugar",
       "specifics.none":
         "Aún no se ha generado un itinerario, por lo que no hay información de lugares.",
+
+      "schedule.category.start": "Salida",
+      "schedule.category.end": "Llegada",
+      "schedule.category.required": "Parada obligatoria",
     },
   },
 
@@ -1060,6 +1092,10 @@ const resources = {
       "specifics.title": "Details zum Ort",
       "specifics.none":
         "Es wurde noch kein Zeitplan erstellt, daher sind keine Ortsinformationen verfügbar.",
+
+      "schedule.category.start": "Start",
+      "schedule.category.end": "Ziel",
+      "schedule.category.required": "Pflichtstopp",
     },
   },
   fr: {
