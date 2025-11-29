@@ -1947,7 +1947,7 @@ const handleSendWish = async () => {
                 </thead>
                 <tbody>
                 {plan.schedule.map((r) => {
-    const flags = getPlaceLangFlags(r.name,getActiveLangCodes());
+    const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
 
     return (
       <tr key={r.order}>
@@ -2076,7 +2076,7 @@ const handleSendWish = async () => {
             {plan?.schedule?.length ? (
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
               {plan.schedule.map((r) => {
-                const flags = getPlaceLangFlags(r.name, getActiveLangCodes());
+                const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
             
                 return (
                   <li key={r.order} style={{ marginBottom: 6 }}>
