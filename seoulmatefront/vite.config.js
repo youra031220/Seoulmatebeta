@@ -1,18 +1,15 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
+      "/api": {
+        target: "http://localhost:5000",   // 🔴 아까 server.js에서 지정한 포트와 같게!
         changeOrigin: true,
-        secure: false, // For development with self-signed certificates
-        ws: true, // Enable WebSocket proxying
-        rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
     },
   },
-})
+});
+
