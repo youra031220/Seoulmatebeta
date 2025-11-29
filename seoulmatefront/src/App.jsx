@@ -20,7 +20,13 @@ export default function App() {
   
     if (lang.startsWith("en")) return ["en"];
     if (lang.startsWith("ja")) return ["ja"];
-    if (lang.startsWith("zh")) return ["zh"]; // zh-CN / zh-TW 모두 포함
+    if (lang.startsWith("zh-CN")) return ["zh_CN"]; // zh-CN / zh-TW 모두 포함
+    if (lang.startsWith("zh-TW")) return ["zh_TW"];
+    if (lang.startsWith("vi")) return ["vi"];
+    if (lang.startsWith("th")) return ["th"];
+    if (lang.startsWith("id")) return ["id"];
+    if (lang.startsWith("es")) return ["es"];
+    if (lang.startsWith("de")) return ["de"];
   
     // ko, vi, th, id, es, de 등은 "선호언어 DB"에 없으므로 국기 표시 없음
     return [];
