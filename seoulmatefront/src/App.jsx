@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   optimizeRoute,
   generateSchedule,
-  getPlaceLangFlags, // 새로 추가
+  getPlaceLangFlags,
 } from "./planner/routePlanner";
 
 import LocationSearch from "./components/LocationSearch/LocationSearch";
@@ -14,7 +14,7 @@ import "./App.css";
 
 export default function App() {
   const { t, i18n } = useTranslation();
-  const currentLang = i18n.language || "ko";   // 🔹 이 줄만 추가
+  const currentLang = i18n.language || "ko"
 
   // 🔹 모든 장소 공통: "영문이름 (한국어 이름)" 형식으로 출력
   const formatPlaceName = (row) => {
@@ -68,18 +68,16 @@ export default function App() {
     if (lang.startsWith("ko")) return ["ko"];
     if (lang.startsWith("en")) return ["en"];
     if (lang.startsWith("ja")) return ["ja"];
-    if (lang.startsWith("zh-CN")) return ["zh_CN"]; // zh-CN / zh-TW 모두 포함
+    if (lang.startsWith("zh-CN")) return ["zh_CN"];
     if (lang.startsWith("zh-TW")) return ["zh_TW"];
     if (lang.startsWith("vi")) return ["vi"];
     if (lang.startsWith("th")) return ["th"];
     if (lang.startsWith("id")) return ["id"];
     if (lang.startsWith("es")) return ["es"];
     if (lang.startsWith("de")) return ["de"];
-  
-    // ko, vi, th, id, es, de 등은 "선호언어 DB"에 없으므로 국기 표시 없음
     return [];
   };
-  
+
 
   /** 출발 / 도착 */
   const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
@@ -479,8 +477,11 @@ export default function App() {
         ? fullConversation
         : t("wish.placeholder");
 
+    // ✅ 디버깅 로그
+    console.log("📤 백엔드로 보내는 메시지:", travelMessage);
+    console.log("📤 컨텍스트:", { breakfast, lunch, dinner, cafe, dietPrefs, themes, pace });
     try {
-      const res = await fetch("http://localhost:5001/api/search-with-pref", {
+      const res = await fetch("http://localhost:5000/api/search-with-pref", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -562,29 +563,29 @@ export default function App() {
           p.category || ""
         );
 
-      return {
-        id: idx,
-        // 🔹 이름은 일단 둘 다 저장해 둔다
-        nameKo: originalName,
-        nameTranslated: translatedName,
-        // 기본 name은 번역 우선, 없으면 한글
-        name: translatedName || originalName,
-        address: p.roadAddress || p.address,
-        lat,
-        lon,
-        categoryKo: originalCategory,
-        categoryTranslated: translatedCategory,
-        category: translatedCategory || originalCategory,
-        rating: p.rating ? Number(p.rating) : 4.0,
-        stay_time: 60,
-        diet_tags: [],
-        categoryType,  // 🔹 식당/카페/기타
-        isFood,        // 🔹 음식 관련 여부
-        _raw: p,
-        _prefs: prefs,
-      };
-    })
-    .filter(Boolean) || [];
+        return {
+          id: idx,
+          // 🔹 이름은 일단 둘 다 저장해 둔다
+          nameKo: originalName,
+          nameTranslated: translatedName,
+          // 기본 name은 번역 우선, 없으면 한글
+          name: translatedName || originalName,
+          address: p.roadAddress || p.address,
+          lat,
+          lon,
+          categoryKo: originalCategory,
+          categoryTranslated: translatedCategory,
+          category: translatedCategory || originalCategory,
+          rating: p.rating ? Number(p.rating) : 4.0,
+          stay_time: 60,
+          diet_tags: [],
+          categoryType,  // 🔹 식당/카페/기타
+          isFood,        // 🔹 음식 관련 여부
+          _raw: p,
+          _prefs: prefs,
+        };
+      })
+      .filter(Boolean) || [];
 
 
 
@@ -616,7 +617,7 @@ export default function App() {
 
     setRefineLoading(true);
     try {
-      const res = await fetch("http://localhost:5001/api/route/refine", {
+      const res = await fetch("http://localhost:5000/api/route/refine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -718,8 +719,14 @@ export default function App() {
         setStatusKey("status.no_pois");
         return;
       }
+      // ✅ 디버깅 로그
+      console.log("🔍 검색된 후보 POI:", basePOIs.length);
+      console.log("🔍 카테고리별:", {
+        attractions: basePOIs.filter(p => p.categoryType === "poi").length,
+        restaurants: basePOIs.filter(p => p.categoryType === "restaurant").length,
+        cafes: basePOIs.filter(p => p.categoryType === "cafe").length,
+      });
 
-      // 후보 목록 저장 및 선택 UI 표시
       setCandidatePOIs(basePOIs);
       setShowCandidateSelector(true);
       setStatusKey(""); // 상태 초기화
@@ -732,6 +739,9 @@ export default function App() {
 
   /** ✅ 2단계: 선택 완료 후 일정 생성 */
   const onConfirmSelection = async (selected) => {
+    // ✅ 디버깅 로그
+    console.log("✅ 사용자가 선택한 POI:", selected.length, selected.map(p => p.name || p.title));
+
     setShowCandidateSelector(false);
     setSelectedPOIs(selected);
     setStatusKey("status.generating");
@@ -747,22 +757,13 @@ export default function App() {
     const maxLegNum = Math.max(5, Number(maxLeg) || 0);
 
     try {
-      // 필수 방문지 + 선택된 POI 합치기
-      const allPois = [...selected];
+      // ✅ 수정: 중복 제거 강화
+          // ✅ 사용자가 선택한 POI는 모두 "무조건 포함" 플래그를 달아서 보낸다
+    const allPois = selected.map((p) => ({
+      ...p,
+      isMustVisit: true,   // 🔥 이 한 줄이 핵심
+    }));
 
-      // 필수 방문지 추가 (중복 제거)
-      requiredStops.forEach((stop) => {
-        const exists = allPois.some(
-          (p) => p.name === stop.name || p.title === stop.name
-        );
-        if (!exists) {
-          allPois.push({
-            ...stop,
-            categoryType: "required",
-            slotType: "required",
-          });
-        }
-      });
 
       if (!allPois.length) {
         setStatusKey("status.no_pois");
@@ -781,7 +782,8 @@ export default function App() {
         weights || {},
         { breakfast, lunch, dinner, cafe }
       );
-
+      // ✅ 디버깅 로그
+      console.log("🗺️ 경로 최적화 결과:", { routeArray: opt.routeArray?.length, route: opt.route });
       // 시간별 일정 생성
       const schedule = generateSchedule(
         opt.routeArray,
@@ -801,7 +803,8 @@ export default function App() {
           nameTranslated: endPoint?.nameTranslated ?? "",
         }
       );
-
+      // ✅ 디버깅 로그
+      console.log("📅 생성된 일정:", schedule?.length, schedule);
       setPlan({ ...opt, schedule });
       setStatusKey("status.success");
 
@@ -817,6 +820,104 @@ export default function App() {
     setCandidatePOIs([]);
     setStatusKey("");
   };
+  /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
+    /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
+  const autoSelectFromCandidates = () => {
+    if (!candidatePOIs || candidatePOIs.length === 0) {
+      alert(t("status.no_pois"));
+      return;
+    }
+
+    // 전체에서 최대 몇 개까지 넣을지 (기존 numPlaces 활용)
+    const maxCount = Math.max(1, Number(numPlaces) || 6);
+
+    const restaurants = candidatePOIs.filter(
+      (p) => p.categoryType === "restaurant"
+    );
+    const cafes = candidatePOIs.filter(
+      (p) => p.categoryType === "cafe"
+    );
+    const attractions = candidatePOIs.filter(
+      (p) => !p.categoryType || p.categoryType === "poi"
+    );
+
+    const selected = [];
+    const used = new Set(); // 같은 장소 중복 방지
+
+    const keyOf = (p) => `${p.lat}:${p.lon}:${p.name || p.title}`;
+
+    const markUsed = (p) => {
+      used.add(keyOf(p));
+    };
+
+    const pickRandomFrom = (list) => {
+      const available = list.filter((p) => !used.has(keyOf(p)));
+      if (!available.length) return null;
+
+      const idx = Math.floor(Math.random() * available.length);
+      const chosen = available[idx];
+      selected.push(chosen);
+      markUsed(chosen);
+      return chosen;
+    };
+
+    // 🍱 식당: 점심/저녁 설정을 참고하되, 최소/최대 개수는 이렇게 정리
+    //  - 점심/저녁 둘 다 켜져 있으면 ideally 2개
+    //  - 둘 중 하나만 켜져 있으면 ideally 1개
+    //  - 둘 다 꺼져 있어도 후보에 식당 많으면 2개까지는 뽑아줌
+    const idealByToggle = (lunch ? 1 : 0) + (dinner ? 1 : 0);
+    const targetRestaurantCount =
+      idealByToggle > 0 ? idealByToggle : 2; // 기본적으로 2개까지 시도
+    const actualRestaurantCount = Math.min(
+      targetRestaurantCount,
+      restaurants.length
+    );
+
+    for (let i = 0; i < actualRestaurantCount; i++) {
+      const picked = pickRandomFrom(restaurants);
+      if (!picked) break;
+    }
+
+    // 나머지 슬롯은 관광지 위주로 채우고, 부족하면 카페/음식점 순으로 채우기
+    let remaining = maxCount - selected.length;
+
+    while (remaining > 0) {
+      let picked = null;
+
+      if (attractions.length > 0) {
+        picked = pickRandomFrom(attractions);
+      }
+
+      if (!picked && cafes.length > 0) {
+        picked = pickRandomFrom(cafes);
+      }
+
+      if (!picked && restaurants.length > 0) {
+        picked = pickRandomFrom(restaurants);
+      }
+
+      if (!picked) break; // 더 이상 뽑을 게 없으면 종료
+      remaining -= 1;
+    }
+
+    if (selected.length === 0) {
+      alert(t("status.no_pois"));
+      return;
+    }
+
+    console.log("🎲 자동 선택된 POI:", {
+      total: selected.length,
+      restaurants: selected.filter((p) => p.categoryType === "restaurant").length,
+      cafes: selected.filter((p) => p.categoryType === "cafe").length,
+      attractions: selected.filter(
+        (p) => !p.categoryType || p.categoryType === "poi"
+      ).length,
+    });
+
+    // 수동 선택이랑 똑같이 기존 로직 재사용
+    onConfirmSelection(selected);
+  };
+
 
 /** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
 const handleSendWish = async () => {
@@ -837,7 +938,7 @@ const handleSendWish = async () => {
   setWishText("");
 
   try {
-    const res = await fetch("http://localhost:5001/api/travel-wish", {
+    const res = await fetch("http://localhost:5000/api/travel-wish", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -961,7 +1062,7 @@ const handleSendWish = async () => {
             zIndex: 1000,
           }}
         >
-          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
+                    <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
             <CandidateSelector
               candidates={candidatePOIs}
               onConfirm={onConfirmSelection}
@@ -969,8 +1070,37 @@ const handleSendWish = async () => {
               mealOptions={{ breakfast, lunch, dinner, cafe }}
               t={t}
             />
+
+            {/* 🎲 추천된 후보들로 자동 선택 버튼 */}
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={autoSelectFromCandidates}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 999,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background:
+                    "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
+                  color: "#ffffff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                }}
+              >
+                알아서 해주세요
+              </button>
+            </div>
           </div>
-        </div>
+          </div>
+        
       )}
 
       {/* 데스크탑: 850px / 1fr 2열, 모바일: 세로로 쌓이는 레이아웃 */}
@@ -1705,7 +1835,7 @@ const handleSendWish = async () => {
                   </tr>
                 </thead>
                 <tbody>
-  {plan.schedule.map((r) => {
+                {plan.schedule.map((r) => {
     const flags = getPlaceLangFlags(r.name,getActiveLangCodes());
 
     return (
@@ -1812,7 +1942,7 @@ const handleSendWish = async () => {
   })}
 </tbody>
 
-              </table>
+</table>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {t("schedule.none")}
@@ -1843,13 +1973,13 @@ const handleSendWish = async () => {
                               style={{ marginRight: 4 }}
                             >
                               {info.flag}
-                            </span>
+                              </span>
                           ))}
                         </span>
                       )}
                     </b>{" "}
                      —{" "}
-                    {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
+                     {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
                     {(() => {
                       const raw = r.category || "";           // 원본 카테고리 (출발/도착/required/기타)
                       const ko = r.categoryKo || raw;        // 한국어 카테고리
@@ -1928,5 +2058,6 @@ const handleSendWish = async () => {
     </div>
   );
 }
+
 
 
