@@ -487,6 +487,7 @@ export default function App() {
         body: JSON.stringify({
           baseArea: "서울",
           message: travelMessage,
+          lang: i18n.language,   // 🔹 ko / en / ja
           context: {
             breakfast,
             lunch,
