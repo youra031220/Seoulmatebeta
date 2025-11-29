@@ -479,6 +479,9 @@ export default function App() {
         ? fullConversation
         : t("wish.placeholder");
 
+    // ✅ 디버깅 로그
+    console.log("📤 백엔드로 보내는 메시지:", travelMessage);
+    console.log("📤 컨텍스트:", { breakfast, lunch, dinner, cafe, dietPrefs, themes, pace });
     try {
       const res = await fetch("http://localhost:5000/api/search-with-pref", {
         method: "POST",
@@ -718,8 +721,14 @@ export default function App() {
         setStatusKey("status.no_pois");
         return;
       }
+      // ✅ 디버깅 로그
+      console.log("🔍 검색된 후보 POI:", basePOIs.length);
+      console.log("🔍 카테고리별:", {
+        attractions: basePOIs.filter(p => p.categoryType === "poi").length,
+        restaurants: basePOIs.filter(p => p.categoryType === "restaurant").length,
+        cafes: basePOIs.filter(p => p.categoryType === "cafe").length,
+      });
 
-      // 후보 목록 저장 및 선택 UI 표시
       setCandidatePOIs(basePOIs);
       setShowCandidateSelector(true);
       setStatusKey(""); // 상태 초기화
@@ -732,6 +741,9 @@ export default function App() {
 
   /** ✅ 2단계: 선택 완료 후 일정 생성 */
   const onConfirmSelection = async (selected) => {
+    // ✅ 디버깅 로그
+    console.log("✅ 사용자가 선택한 POI:", selected.length, selected.map(p => p.name || p.title));
+
     setShowCandidateSelector(false);
     setSelectedPOIs(selected);
     setStatusKey("status.generating");
@@ -781,7 +793,8 @@ export default function App() {
         weights || {},
         { breakfast, lunch, dinner, cafe }
       );
-
+      // ✅ 디버깅 로그
+      console.log("🗺️ 경로 최적화 결과:", { routeArray: opt.routeArray?.length, route: opt.route });
       // 시간별 일정 생성
       const schedule = generateSchedule(
         opt.routeArray,
@@ -801,7 +814,8 @@ export default function App() {
           nameTranslated: endPoint?.nameTranslated ?? "",
         }
       );
-
+      // ✅ 디버깅 로그
+      console.log("📅 생성된 일정:", schedule?.length, schedule);
       setPlan({ ...opt, schedule });
       setStatusKey("status.success");
 
