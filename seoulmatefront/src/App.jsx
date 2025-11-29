@@ -12,6 +12,8 @@ import RequiredStops from "./components/RequiredStops/RequiredStops";
 import Header from "./components/Header/Header";
 import CandidateSelector from "./components/CandidateSelector";
 import "./App.css";
+import AtlasLogo from "./AtlasLogo";
+
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -1859,6 +1861,27 @@ const handleSendWish = async () => {
               </section>
             </div>
           </div>
+          {/* 채팅칸 끝나는 부분 바로 아래에 삽입 */}
+
+       {/* 챗봇 박스 아래, 버튼 위 */}
+      <div className="atlas-loading-wrapper">
+        {statusKey === "status.generating" && (
+          <div className="atlas-loading">
+            <div className="atlas-logo-spinner">
+              <AtlasLogo size={28} />
+            </div>
+
+            <div className="atlas-loading-text">
+              <div className="atlas-powered">
+                Powered by <strong>ATLAS Engine</strong>
+              </div>
+              <div className="atlas-status">{t(statusKey)}</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+
 
           {/* 하단: 여행계획 생성 버튼 */}
           <button
@@ -1881,12 +1904,6 @@ const handleSendWish = async () => {
             {t("button.generate")}
           </button>
 
-          {/* 상태 메시지 */}
-          {statusKey && (
-            <div style={{ marginTop: 12, fontSize: 13, color: "#16a34a" }}>
-              {t(statusKey)}
-            </div>
-          )}
         </aside>
 
         {/* ================= 오른쪽: 지도 + 아래에 일정/장소 ================= */}

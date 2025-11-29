@@ -106,6 +106,22 @@ const resources = {
       "category.start": "출발",
       "category.end": "도착",
       "category.required": "필수 방문지",
+      "button.auto_select": "알아서 해주세요",
+      // 🔹 CandidateSelector
+      "candidate.title": "방문할 장소를 선택하세요",
+      "candidate.subtitle": "추천된 장소 중 원하는 곳을 선택하면 일정을 생성합니다.",
+      "candidate.attractions.title": "관광지",
+      "candidate.attractions.desc": "여러 개 선택 가능",
+      "candidate.lunch.title": "점심 식당",
+      "candidate.lunch.desc": "1개 선택",
+      "candidate.dinner.title": "저녁 식당",
+      "candidate.dinner.desc": "1개 선택 (점심과 다른 곳 추천)",
+      "candidate.cafe.title": "카페",
+      "candidate.cafe.desc": "1개 선택",
+      "candidate.no_results": "검색 결과가 없습니다.",
+      "candidate.cancel": "취소",
+      "candidate.confirm": "선택 완료 ({{count}}개) → 일정 생성",
+      "candidate.maxSelectionLabel": ", 최대 {{max}}개",
     },
   },
 
@@ -207,6 +223,23 @@ const resources = {
       "specifics.title": "Place Details",
       "specifics.none":
         "No schedule has been generated yet, so place details are not available.",
+      "button.auto_select": "Auto-select for me",
+        // 🔹 CandidateSelector
+      "candidate.title": "Select places to visit",
+      "candidate.subtitle":
+        "Pick the places you like from the recommended list to generate your itinerary.",
+      "candidate.attractions.title": "Attractions",
+      "candidate.attractions.desc": "You can select multiple places.",
+      "candidate.lunch.title": "Lunch restaurant",
+      "candidate.lunch.desc": "Select 1 place",
+      "candidate.dinner.title": "Dinner restaurant",
+      "candidate.dinner.desc": "Select 1 place (different from lunch if possible)",
+      "candidate.cafe.title": "Cafe",
+      "candidate.cafe.desc": "Select 1 place",
+      "candidate.no_results": "No results found.",
+      "candidate.cancel": "Cancel",
+      "candidate.confirm": "Confirm ({{count}} selected) → Generate itinerary",
+      "candidate.maxSelectionLabel": ", up to {{max}}",
     },
   },
 
@@ -312,6 +345,27 @@ const resources = {
       "category.start": "出発",
       "category.end": "到着",
       "category.required": "必須スポット",
+      "button.auto_select": "おすすめを自動選択して",
+      "candidate.title": "訪れたい場所を選んでください",
+"candidate.subtitle": "おすすめリストの中から行きたい場所を選ぶと、日程を作成します。",
+
+"candidate.attractions.title": "観光スポット",
+"candidate.attractions.desc": "複数選択できます。",
+
+"candidate.lunch.title": "ランチのお店",
+"candidate.lunch.desc": "1ヶ所を選択してください。",
+
+"candidate.dinner.title": "ディナーのお店",
+"candidate.dinner.desc": "1ヶ所を選択してください（できればランチとは別の場所）。",
+
+"candidate.cafe.title": "カフェ",
+"candidate.cafe.desc": "1ヶ所を選択してください。",
+
+"candidate.no_results": "検索結果がありません。",
+"candidate.cancel": "キャンセル",
+"candidate.confirm": "確定（{{count}}件） → 日程を作成",
+"candidate.maxSelectionLabel": "、最大{{max}}件",
+
     },
   },
 
@@ -417,6 +471,27 @@ const resources = {
       "schedule.category.start": "出发",
       "schedule.category.end": "到达",
       "schedule.category.required": "必去景点",
+      "button.auto_select": "帮我自动选择",
+      "candidate.title": "请选择要去的地点",
+"candidate.subtitle": "从推荐列表中选择想去的地方，我们会为你生成行程。",
+
+"candidate.attractions.title": "景点",
+"candidate.attractions.desc": "可以选择多个。",
+
+"candidate.lunch.title": "午餐餐厅",
+"candidate.lunch.desc": "请选择 1 家。",
+
+"candidate.dinner.title": "晚餐餐厅",
+"candidate.dinner.desc": "请选择 1 家（尽量与午餐不同的店）。",
+
+"candidate.cafe.title": "咖啡店",
+"candidate.cafe.desc": "请选择 1 家。",
+
+"candidate.no_results": "没有搜索结果。",
+"candidate.cancel": "取消",
+"candidate.confirm": "确认（已选 {{count}} 个）→ 生成行程",
+"candidate.maxSelectionLabel": "，最多 {{max}} 个",
+
     },
   },
 
@@ -525,6 +600,27 @@ const resources = {
       "schedule.category.start": "出發",
       "schedule.category.end": "抵達",
       "schedule.category.required": "必去景點",
+      "button.auto_select": "幫我自動選擇",
+      "candidate.title": "請選擇想去的地點",
+"candidate.subtitle": "從推薦清單中選擇想去的地方，我們會為你產生日程。",
+
+"candidate.attractions.title": "景點",
+"candidate.attractions.desc": "可以選擇多個。",
+
+"candidate.lunch.title": "午餐餐廳",
+"candidate.lunch.desc": "請選擇 1 家。",
+
+"candidate.dinner.title": "晚餐餐廳",
+"candidate.dinner.desc": "請選擇 1 家（盡量與午餐不同的店）。",
+
+"candidate.cafe.title": "咖啡廳",
+"candidate.cafe.desc": "請選擇 1 家。",
+
+"candidate.no_results": "沒有搜尋結果。",
+"candidate.cancel": "取消",
+"candidate.confirm": "確認（已選 {{count}} 個）→ 產生日程",
+"candidate.maxSelectionLabel": "，最多 {{max}} 個",
+
     },
   },
 
@@ -637,6 +733,27 @@ const resources = {
       "schedule.category.start": "Khởi hành",
       "schedule.category.end": "Kết thúc",
       "schedule.category.required": "Điểm bắt buộc",
+      "button.auto_select": "Chọn giúp tôi",
+      "candidate.title": "Chọn những địa điểm bạn muốn ghé",
+"candidate.subtitle": "Hãy chọn những địa điểm bạn thích trong danh sách gợi ý để tạo lịch trình.",
+
+"candidate.attractions.title": "Địa điểm tham quan",
+"candidate.attractions.desc": "Bạn có thể chọn nhiều địa điểm.",
+
+"candidate.lunch.title": "Nhà hàng ăn trưa",
+"candidate.lunch.desc": "Chọn 1 địa điểm.",
+
+"candidate.dinner.title": "Nhà hàng ăn tối",
+"candidate.dinner.desc": "Chọn 1 địa điểm (nếu được thì khác với nơi ăn trưa).",
+
+"candidate.cafe.title": "Quán cà phê",
+"candidate.cafe.desc": "Chọn 1 địa điểm.",
+
+"candidate.no_results": "Không có kết quả tìm kiếm.",
+"candidate.cancel": "Hủy",
+"candidate.confirm": "Xác nhận ({{count}} địa điểm) → Tạo lịch trình",
+"candidate.maxSelectionLabel": ", tối đa {{max}} địa điểm",
+
     },
   },
 
@@ -747,6 +864,27 @@ const resources = {
       "schedule.category.start": "ออกเดินทาง",
       "schedule.category.end": "สิ้นสุด",
       "schedule.category.required": "จุดที่ต้องไป",
+      "button.auto_select": "เลือกให้ฉันอัตโนมัติ",
+      "candidate.title": "เลือกสถานที่ที่คุณอยากไป",
+"candidate.subtitle": "เลือกสถานที่ที่คุณสนใจจากรายการแนะนำเพื่อสร้างทริปให้คุณ.",
+
+"candidate.attractions.title": "สถานที่ท่องเที่ยว",
+"candidate.attractions.desc": "สามารถเลือกได้หลายแห่ง.",
+
+"candidate.lunch.title": "ร้านอาหารกลางวัน",
+"candidate.lunch.desc": "เลือกได้ 1 แห่ง.",
+
+"candidate.dinner.title": "ร้านอาหารเย็น",
+"candidate.dinner.desc": "เลือกได้ 1 แห่ง (ถ้าเป็นไปได้ควรต่างจากร้านกลางวัน).",
+
+"candidate.cafe.title": "คาเฟ่",
+"candidate.cafe.desc": "เลือกได้ 1 แห่ง.",
+
+"candidate.no_results": "ไม่พบผลการค้นหา.",
+"candidate.cancel": "ยกเลิก",
+"candidate.confirm": "ยืนยัน (เลือกแล้ว {{count}} แห่ง) → สร้างทริป",
+"candidate.maxSelectionLabel": ", เลือกได้สูงสุด {{max}} แห่ง",
+
     },
   },
 
@@ -858,6 +996,27 @@ const resources = {
       "schedule.category.start": "Mulai",
       "schedule.category.end": "Selesai",
       "schedule.category.required": "Tempat wajib",
+      "button.auto_select": "Pilihkan otomatis untuk saya",
+      "candidate.title": "Pilih tempat yang ingin kamu kunjungi",
+"candidate.subtitle": "Pilih tempat yang kamu suka dari daftar rekomendasi untuk membuat rencana perjalanan.",
+
+"candidate.attractions.title": "Objek wisata",
+"candidate.attractions.desc": "Kamu bisa memilih beberapa tempat.",
+
+"candidate.lunch.title": "Restoran untuk makan siang",
+"candidate.lunch.desc": "Pilih 1 tempat.",
+
+"candidate.dinner.title": "Restoran untuk makan malam",
+"candidate.dinner.desc": "Pilih 1 tempat (sebisa mungkin berbeda dengan restoran makan siang).",
+
+"candidate.cafe.title": "Kafe",
+"candidate.cafe.desc": "Pilih 1 tempat.",
+
+"candidate.no_results": "Tidak ada hasil pencarian.",
+"candidate.cancel": "Batal",
+"candidate.confirm": "Konfirmasi ({{count}} tempat) → Buat rencana perjalanan",
+"candidate.maxSelectionLabel": ", maksimal {{max}} tempat",
+
     },
   },
 
@@ -976,6 +1135,28 @@ const resources = {
       "schedule.category.start": "Salida",
       "schedule.category.end": "Llegada",
       "schedule.category.required": "Parada obligatoria",
+      "button.auto_select": "Selecciona por mí",
+      "candidate.title": "Elige los lugares que quieres visitar",
+"candidate.subtitle": "Selecciona los lugares que te gustan de la lista recomendada para generar tu itinerario.",
+
+"candidate.attractions.title": "Lugares turísticos",
+"candidate.attractions.desc": "Puedes seleccionar varios lugares.",
+
+"candidate.lunch.title": "Restaurante para el almuerzo",
+"candidate.lunch.desc": "Elige 1 lugar.",
+
+"candidate.dinner.title": "Restaurante para la cena",
+"candidate.dinner.desc": "Elige 1 lugar (a ser posible distinto del almuerzo).",
+
+"candidate.cafe.title": "Cafetería",
+"candidate.cafe.desc": "Elige 1 lugar.",
+
+"candidate.no_results": "No se han encontrado resultados.",
+"candidate.cancel": "Cancelar",
+"candidate.confirm": "Confirmar ({{count}} lugares) → Generar itinerario",
+"candidate.maxSelectionLabel": ", máximo {{max}} lugares",
+
+
     },
   },
 
@@ -1096,6 +1277,27 @@ const resources = {
       "schedule.category.start": "Start",
       "schedule.category.end": "Ziel",
       "schedule.category.required": "Pflichtstopp",
+      "button.auto_select": "Automatisch für mich auswählen",
+      "candidate.title": "Wähle die Orte aus, die du besuchen möchtest",
+"candidate.subtitle": "Wähle aus der empfohlenen Liste deine Lieblingsorte, um eine Reiseroute zu erstellen.",
+
+"candidate.attractions.title": "Sehenswürdigkeiten",
+"candidate.attractions.desc": "Du kannst mehrere Orte auswählen.",
+
+"candidate.lunch.title": "Restaurant zum Mittagessen",
+"candidate.lunch.desc": "Wähle 1 Ort aus.",
+
+"candidate.dinner.title": "Restaurant zum Abendessen",
+"candidate.dinner.desc": "Wähle 1 Ort aus (wenn möglich ein anderes als zum Mittagessen).",
+
+"candidate.cafe.title": "Café",
+"candidate.cafe.desc": "Wähle 1 Ort aus.",
+
+"candidate.no_results": "Keine Suchergebnisse gefunden.",
+"candidate.cancel": "Abbrechen",
+"candidate.confirm": "Bestätigen ({{count}} Orte) → Route erstellen",
+"candidate.maxSelectionLabel": ", maximal {{max}} Orte",
+
     },
   },
   fr: {
@@ -1207,6 +1409,28 @@ const resources = {
       "specifics.title": "Détails du lieu",
       "specifics.none":
         "Aucun itinéraire n’a été généré pour le moment, les informations de lieu ne sont donc pas disponibles.",
+        "button.auto_select": "Sélection automatique",
+        "candidate.title": "Sélectionnez les lieux à visiter",
+"candidate.subtitle": "Choisissez parmi les lieux recommandés pour générer votre itinéraire.",
+
+"candidate.attractions.title": "Attractions",
+"candidate.attractions.desc": "Vous pouvez en sélectionner plusieurs.",
+
+"candidate.lunch.title": "Restaurant pour le déjeuner",
+"candidate.lunch.desc": "Sélectionnez 1 lieu.",
+
+"candidate.dinner.title": "Restaurant pour le dîner",
+"candidate.dinner.desc": "Sélectionnez 1 lieu (différent de celui du déjeuner si possible).",
+
+"candidate.cafe.title": "Café",
+"candidate.cafe.desc": "Sélectionnez 1 lieu.",
+
+"candidate.no_results": "Aucun résultat trouvé.",
+"candidate.cancel": "Annuler",
+"candidate.confirm": "Confirmer ({{count}} sélectionné(s)) → Générer l’itinéraire",
+"candidate.maxSelectionLabel": ", maximum {{max}}",
+
+
     },
   },
 
