@@ -1,0 +1,3 @@
+./seoulmateback/agents/scoringAgent.js
+./seoulmateback/agents/weightAgent.js
+./seoulmateback/server.js

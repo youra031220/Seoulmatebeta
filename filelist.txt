@@ -1,0 +1,16 @@
+./seoulmateback/agents/scoringAgent.js
+./seoulmateback/agents/weightAgent.js
+./seoulmateback/server.js
+./seoulmatefront/postcss.config.js
+./seoulmatefront/src/components/LocationSearch/LocationSearch.jsx
+./seoulmatefront/src/components/LocationSearch/index.js
+./seoulmatefront/src/components/RequiredStops/RequiredStops.jsx
+./seoulmatefront/src/components/RequiredStops/Tag.jsx
+./seoulmatefront/src/components/Header/Logo.jsx
+./seoulmatefront/src/components/Header/Header.jsx
+./seoulmatefront/src/planner/routePlanner.js
+./seoulmatefront/src/i18n.js
+./seoulmatefront/src/main.jsx
+./seoulmatefront/src/App.jsx
+./seoulmatefront/eslint.config.js
+./seoulmatefront/vite.config.js
