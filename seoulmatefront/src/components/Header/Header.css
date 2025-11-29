@@ -42,6 +42,7 @@
 .sm-header-subtitle {
   flex: 1;
   margin: 0;
+  height: 5px;
   font-size: 13px;
   line-height: 1.5;
   opacity: 0.95;
@@ -101,6 +102,7 @@
   }
 
   .sm-header-left {
+    margin: 2px;
     /* 로고 + Seoulmate는 그대로 가로 한 줄 */
   }
 

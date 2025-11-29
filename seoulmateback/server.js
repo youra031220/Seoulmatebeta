@@ -321,8 +321,8 @@ ${JSON.stringify(context, null, 2)}
 const GENERIC_KEYWORDS = new Set(["맛집", "카페", "명소", "관광지", "데이트", "핫플레이스"]);
 
 // Poi/Food 쿼리 개수 상한 (Rate limit 방지용)
-const MAX_POI_QUERIES = 15;
-const MAX_FOOD_QUERIES = 15;
+const MAX_POI_QUERIES = 8;
+const MAX_FOOD_QUERIES = 5;
 
 function isTooGenericKeyword(kw) {
   if (!kw) return true;
@@ -453,7 +453,18 @@ function buildSearchQueriesFromPreference(prefs, baseArea = "서울") {
 }
 
 // ===================== 네이버 지역 검색 헬퍼 =====================
-async function naverLocalSearch(query, display = 30) {
+
+// ===================== 네이버 지역 검색 헬퍼 =====================
+
+// 네이버 로컬 검색 사이에 최소 간격(ms)
+// 너무 작게 하면 또 rate limit 걸릴 수 있음. 필요하면 300~500으로 키워도 됨.
+const NAVER_SEARCH_DELAY_MS = 200;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function naverLocalSearch(query, display = 10) {
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
     const credentialError = new Error("NAVER API 자격 증명이 없습니다.");
     console.error("❌ Naver local search credential error");
@@ -461,6 +472,9 @@ async function naverLocalSearch(query, display = 30) {
   }
 
   try {
+    // 간단 딜레이로 QPS 낮추기
+    await sleep(NAVER_SEARCH_DELAY_MS);
+
     const response = await axios.get(
       "https://openapi.naver.com/v1/search/local.json",
       {
@@ -473,10 +487,32 @@ async function naverLocalSearch(query, display = 30) {
     );
     return response?.data?.items || [];
   } catch (error) {
-    console.error("❌ Naver local search error:", error.response?.data || error.message);
+    const status = error.response?.status;
+    const data = error.response?.data;
+    const msg = data?.errorMessage || "";
+
+    console.error("❌ Naver local search error:", data || error.message);
+
+    // ✅ rate limit(429 / errorCode 012 / 메시지에 '속도 제한')일 때는
+    //    이 쿼리만 빈 결과로 처리하고, 전체 API는 계속 진행
+    const isRateLimit =
+      status === 429 ||
+      data?.errorCode === "012" ||
+      /rate limit/i.test(msg) ||
+      /속도 제한/.test(msg);
+
+    if (isRateLimit) {
+      console.warn(
+        `⚠️ Naver local search rate limit 초과 (query="${query}") → 이 쿼리는 빈 결과로 처리합니다.`
+      );
+      return [];
+    }
+
+    // 그 외 에러는 기존처럼 상위로 throw
     throw error;
   }
 }
+
 
 // ===================== API 라우트 =====================
 

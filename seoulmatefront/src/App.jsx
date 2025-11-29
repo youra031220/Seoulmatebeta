@@ -846,27 +846,13 @@ export default function App() {
 
     try {
       // ✅ 수정: 중복 제거 강화
-      const allPois = [...selected];
-  
-      // 필수 방문지 추가 (이름 + 좌표로 중복 체크)
-      requiredStops.forEach((stop) => {
-        const exists = allPois.some((p) => {
-          const nameMatch = (p.name === stop.name) || (p.title === stop.name) || 
-                            (p.nameKo === stop.name) || (p.name === stop.nameKo);
-          const coordMatch = p.lat === stop.lat && p.lon === stop.lon;
-          return nameMatch || coordMatch;
-        });
-        
-        if (!exists) {
-          allPois.push({
-            ...stop,
-            categoryType: "required",
-            slotType: "required",
-          });
-        } else {
-          console.log("⚠️ 중복 제거:", stop.name);
-        }
-      });
+
+          // ✅ 사용자가 선택한 POI는 모두 "무조건 포함" 플래그를 달아서 보낸다
+    const allPois = selected.map((p) => ({
+      ...p,
+      isMustVisit: true,   // 🔥 이 한 줄이 핵심
+    }));
+
 
       if (!allPois.length) {
         setStatusKey("status.no_pois");
@@ -887,8 +873,10 @@ export default function App() {
       );
       // ✅ 디버깅 로그
       console.log("🗺️ 경로 최적화 결과:", { routeArray: opt.routeArray?.length, route: opt.route });
-      // 시간별 일정 생성 (원본)
-      const rawSchedule = generateSchedule(
+
+      // 시간별 일정 생성
+      const schedule = generateSchedule(
+
         opt.routeArray,
         opt.route,
         opt.waits,
@@ -907,50 +895,9 @@ export default function App() {
         }
       );
 
-      // 🔧 출발지/도착지 행만 한 번 더 덮어쓰기
-      const schedule = (rawSchedule || []).map((row) => {
-        if (!row) return row;
-
-        // 1) 출발지 행 (category === "출발")
-        if (row.category === "출발" && startPoint) {
-          const sp = startPoint;
-          const nameTranslated =
-            sp.nameTranslated || sp.name || row.name || "";
-
-          const nameKo =
-            sp.nameKo || sp.name || row.nameKo || row.name || "";
-
-          return {
-            ...row,
-            name: nameTranslated,        // base가 항상 외국어가 되도록
-            nameKo,                      // 한국어 이름
-            nameTranslated,              // 번역 필드도 동일하게
-          };
-        }
-
-        // 2) 도착지 행 (category === "도착")
-        if (row.category === "도착" && endPoint) {
-          const ep = endPoint;
-          const nameTranslated =
-            ep.nameTranslated || ep.name || row.name || "";
-
-          const nameKo =
-            ep.nameKo || ep.name || row.nameKo || row.name || "";
-
-          return {
-            ...row,
-            name: nameTranslated,
-            nameKo,
-            nameTranslated,
-          };
-        }
-
-        // 그 외(필수/일반 방문지)는 그대로
-        return row;
-      });
-
       // ✅ 디버깅 로그
-      console.log("📅 패치된 일정:", schedule?.length, schedule);
+      console.log("📅 생성된 일정:", schedule?.length, schedule);
+
       setPlan({ ...opt, schedule });
       setStatusKey("status.success");
 
@@ -967,6 +914,104 @@ export default function App() {
     setCandidatePOIs([]);
     setStatusKey("");
   };
+  /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
+    /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
+  const autoSelectFromCandidates = () => {
+    if (!candidatePOIs || candidatePOIs.length === 0) {
+      alert(t("status.no_pois"));
+      return;
+    }
+
+    // 전체에서 최대 몇 개까지 넣을지 (기존 numPlaces 활용)
+    const maxCount = Math.max(1, Number(numPlaces) || 6);
+
+    const restaurants = candidatePOIs.filter(
+      (p) => p.categoryType === "restaurant"
+    );
+    const cafes = candidatePOIs.filter(
+      (p) => p.categoryType === "cafe"
+    );
+    const attractions = candidatePOIs.filter(
+      (p) => !p.categoryType || p.categoryType === "poi"
+    );
+
+    const selected = [];
+    const used = new Set(); // 같은 장소 중복 방지
+
+    const keyOf = (p) => `${p.lat}:${p.lon}:${p.name || p.title}`;
+
+    const markUsed = (p) => {
+      used.add(keyOf(p));
+    };
+
+    const pickRandomFrom = (list) => {
+      const available = list.filter((p) => !used.has(keyOf(p)));
+      if (!available.length) return null;
+
+      const idx = Math.floor(Math.random() * available.length);
+      const chosen = available[idx];
+      selected.push(chosen);
+      markUsed(chosen);
+      return chosen;
+    };
+
+    // 🍱 식당: 점심/저녁 설정을 참고하되, 최소/최대 개수는 이렇게 정리
+    //  - 점심/저녁 둘 다 켜져 있으면 ideally 2개
+    //  - 둘 중 하나만 켜져 있으면 ideally 1개
+    //  - 둘 다 꺼져 있어도 후보에 식당 많으면 2개까지는 뽑아줌
+    const idealByToggle = (lunch ? 1 : 0) + (dinner ? 1 : 0);
+    const targetRestaurantCount =
+      idealByToggle > 0 ? idealByToggle : 2; // 기본적으로 2개까지 시도
+    const actualRestaurantCount = Math.min(
+      targetRestaurantCount,
+      restaurants.length
+    );
+
+    for (let i = 0; i < actualRestaurantCount; i++) {
+      const picked = pickRandomFrom(restaurants);
+      if (!picked) break;
+    }
+
+    // 나머지 슬롯은 관광지 위주로 채우고, 부족하면 카페/음식점 순으로 채우기
+    let remaining = maxCount - selected.length;
+
+    while (remaining > 0) {
+      let picked = null;
+
+      if (attractions.length > 0) {
+        picked = pickRandomFrom(attractions);
+      }
+
+      if (!picked && cafes.length > 0) {
+        picked = pickRandomFrom(cafes);
+      }
+
+      if (!picked && restaurants.length > 0) {
+        picked = pickRandomFrom(restaurants);
+      }
+
+      if (!picked) break; // 더 이상 뽑을 게 없으면 종료
+      remaining -= 1;
+    }
+
+    if (selected.length === 0) {
+      alert(t("status.no_pois"));
+      return;
+    }
+
+    console.log("🎲 자동 선택된 POI:", {
+      total: selected.length,
+      restaurants: selected.filter((p) => p.categoryType === "restaurant").length,
+      cafes: selected.filter((p) => p.categoryType === "cafe").length,
+      attractions: selected.filter(
+        (p) => !p.categoryType || p.categoryType === "poi"
+      ).length,
+    });
+
+    // 수동 선택이랑 똑같이 기존 로직 재사용
+    onConfirmSelection(selected);
+  };
+
 
 /** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
 const handleSendWish = async () => {
@@ -1111,7 +1156,7 @@ const handleSendWish = async () => {
             zIndex: 1000,
           }}
         >
-          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
+                    <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
             <CandidateSelector
               candidates={candidatePOIs}
               onConfirm={onConfirmSelection}
@@ -1119,8 +1164,37 @@ const handleSendWish = async () => {
               mealOptions={{ breakfast, lunch, dinner, cafe }}
               t={t}
             />
+
+            {/* 🎲 추천된 후보들로 자동 선택 버튼 */}
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={autoSelectFromCandidates}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 999,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background:
+                    "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
+                  color: "#ffffff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                }}
+              >
+                알아서 해주세요
+              </button>
+            </div>
           </div>
-        </div>
+          </div>
+        
       )}
 
       {/* 데스크탑: 850px / 1fr 2열, 모바일: 세로로 쌓이는 레이아웃 */}
@@ -1993,6 +2067,7 @@ const handleSendWish = async () => {
                       {r.order}. {formatPlaceName(r)}
                       {flags.length > 0 && (
                         <span style={{ marginLeft: 6 }}>
+
                          {flags.map((info) => (
                             <ReactCountryFlag
                             key={info.code}
@@ -2008,6 +2083,7 @@ const handleSendWish = async () => {
                           />
                         ))}
                       </span>
+
                       )}
                     </b>{" "}
                      —{" "}
@@ -2089,4 +2165,8 @@ const handleSendWish = async () => {
       </div>
     </div>
   );
+
 }
+
+
+
