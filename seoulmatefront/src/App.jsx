@@ -1191,7 +1191,7 @@ const handleSendWish = async () => {
                   boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
                 }}
               >
-                알아서 해주세요
+                {t("button.auto_select")}
               </button>
             </div>
           </div>
