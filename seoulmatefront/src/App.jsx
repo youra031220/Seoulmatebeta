@@ -17,7 +17,7 @@ export default function App() {
 
   const getActiveLangCodes = () => {
     const lang = i18n.language || "ko";
-  
+    if (lang.startsWith("ko")) return ["ko"];
     if (lang.startsWith("en")) return ["en"];
     if (lang.startsWith("ja")) return ["ja"];
     if (lang.startsWith("zh-CN")) return ["zh_CN"]; // zh-CN / zh-TW 모두 포함

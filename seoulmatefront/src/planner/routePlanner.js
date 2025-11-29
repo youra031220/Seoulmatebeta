@@ -62,6 +62,7 @@ export const ALL_POIS = [
 
 // 언어 코드별 국기/라벨
 const LANGUAGE_FLAGS = {
+  ko: { code: "ko", label: "한국어 사용자 선호", flag: "🇰🇷" },
   en: { code: "en", label: "English user favorite", flag: "🇺🇸" }, // 필요하면 🇬🇧 등으로 변경
   zh_CN: { code: "zh-CN", label: "중국어 사용자 선호",      flag: "🇨🇳" },
   zh_TW: { code: "zh-TW", label: "대만어 사용자 선호",      flag: "🇹🇼" },
@@ -90,6 +91,39 @@ function normalizePlaceName(name = "") {
  * (실제 서비스에서는 각 언어별 실제 이름이나 placeId 기반으로 바꿔도 됨)
  */
 const PREFERRED_PLACES_BY_LANG = {
+  ko: new Set([
+  normalizePlaceName("성수동카페거리"),
+  normalizePlaceName("연남동 연트럴파크"),
+  normalizePlaceName("망원시장"),
+  normalizePlaceName("합정 메세나폴리스"),
+  normalizePlaceName("여의도 한강공원"),
+  normalizePlaceName("반포 한강공원"),
+  normalizePlaceName("서촌 마을"),
+  normalizePlaceName("삼청동길"),
+  normalizePlaceName("을지로 노가리 골목"),
+  normalizePlaceName("을지로 카페거리"),
+  normalizePlaceName("혜화 대학로"),
+  normalizePlaceName("상수동 카페거리"),
+  normalizePlaceName("홍대 걷고싶은거리"),
+  normalizePlaceName("더현대 서울"),
+  normalizePlaceName("코엑스 별마당 도서관"),
+  normalizePlaceName("압구정 로데오거리"),
+  normalizePlaceName("청담 가로수길"),
+  normalizePlaceName("석촌호수"),
+  normalizePlaceName("롯데타워 전망대"),
+  normalizePlaceName("뚝섬 서울숲"),
+  normalizePlaceName("잠실 롯데월드몰"),
+  normalizePlaceName("익선동 한옥거리"),
+  normalizePlaceName("한남동 카페거리"),
+  normalizePlaceName("노량진 수산시장"),
+  normalizePlaceName("광장시장"),
+  normalizePlaceName("서울식물원"),
+  normalizePlaceName("양재 시민의숲"),
+  normalizePlaceName("북서울 꿈의 숲"),
+  normalizePlaceName("디뮤지엄 성수"),
+  normalizePlaceName("아모레 성수") // 30
+]),
+
   en: new Set([
     normalizePlaceName("경복궁"),
     normalizePlaceName("북촌 한옥마을"),
