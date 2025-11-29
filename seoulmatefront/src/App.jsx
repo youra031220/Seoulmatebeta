@@ -14,57 +14,41 @@ import CandidateSelector from "./components/CandidateSelector";
 import "./App.css";
 import AtlasLogo from "./AtlasLogo";
 
-
 export default function App() {
   const { t, i18n } = useTranslation();
-  const currentLang = i18n.language || "ko"
+  const currentLang = i18n.language || "ko";
 
-  // 🔹 모든 장소 공통: "영문이름 (한국어 이름)" 형식으로 출력
   const formatPlaceName = (row) => {
     if (!row) return "";
 
     const base =
-      row.nameTranslated ||   // 번역 이름 (영어/일본어 등)
-      row.name ||             // 기본 이름
+      row.nameTranslated ||
+      row.name ||
       "";
 
-    const ko = row.nameKo || ""; // 한국어 이름
+    const ko = row.nameKo || "";
 
-    // 1) 한국어 UI → 한국어만 보여주기
     if (currentLang === "ko") {
-      // 한국어 있으면 한국어, 없으면 base
       return ko || base;
     }
 
-    // 2) 외국어 UI (en, ja 등)
-    // 둘 다 없으면 빈 문자열
     if (!base && !ko) return "";
-
-    // 한국어가 없거나, 둘이 같으면 하나만
     if (!ko || base === ko) {
       return base || ko;
     }
-
-    // 둘 다 있고 다르면: "외국어 (한국어)" 형식
-    // 예: "Gyeongbokgung Palace (경복궁)"
     return `${base} (${ko})`;
   };
-
 
   const formatCategory = (row) => {
     if (!row) return "";
 
     const raw = row.category || "";
 
-    // 1) 출발 / 도착 / 필수 방문지 → i18n 키로 번역 (영어만)
-    if (raw === "출발") return t("category.start");   // 수정
-    if (raw === "도착") return t("category.end");     // 수정
-    if (raw === "required") return t("category.required"); // 수정 (required도 일관성 확보)
+    if (raw === "출발") return t("category.start");
+    if (raw === "도착") return t("category.end");
+    if (raw === "required") return t("category.required");
 
-    // 2) 그 외 일반 카테고리: 영어 한 줄만 보이도록
     const tr = row.categoryTranslated || raw;
-
-    // UI 언어와 상관없이 카테고리는 영어 한 줄만 사용
     return tr;
   };
 
@@ -83,11 +67,10 @@ export default function App() {
     return [];
   };
 
-
   /** 출발 / 도착 */
-  const [startPoint, setStartPoint] = useState(null); // {name, lat, lon}
+  const [startPoint, setStartPoint] = useState(null);
   const [endPoint, setEndPoint] = useState(null);
-  const [sameStartEnd, setSameStartEnd] = useState(false); // 출발·도착 동일 여부
+  const [sameStartEnd, setSameStartEnd] = useState(false);
 
   /** 필수 방문지 */
   const [requiredStops, setRequiredStops] = useState([]);
@@ -106,8 +89,8 @@ export default function App() {
   const requiredInfoWindowRef = useRef(null);
 
   /** 여행 취향 입력 */
-  const [wishText, setWishText] = useState(""); // 입력창 내용
-  const [wishLog, setWishLog] = useState([]); // 보관용
+  const [wishText, setWishText] = useState("");
+  const [wishLog, setWishLog] = useState([]);
 
   /** 끼니 선택 */
   const [breakfast, setBreakfast] = useState(false);
@@ -115,63 +98,46 @@ export default function App() {
   const [dinner, setDinner] = useState(true);
   const [cafe, setCafe] = useState(false);
 
-  /** 끼니 버튼 hover 상태 */
   const [hoveredMeal, setHoveredMeal] = useState(null);
 
   /** 선호 이동수단 */
-  const [transportMode, setTransportMode] = useState("public"); // "walk" | "public" | "car"
+  const [transportMode, setTransportMode] = useState("public");
   const [hoveredTransport, setHoveredTransport] = useState(null);
 
   /** 식단 제약 */
-  const [dietPrefs, setDietPrefs] = useState([]); // ["halal", "vegan", "kosher", "gluten_free", "non_alcohol"]
+  const [dietPrefs, setDietPrefs] = useState([]);
   const [hoveredDiet, setHoveredDiet] = useState(null);
 
-  /** 여행 테마 (최대 3개 선택) */
-  const [themes, setThemes] = useState([]); // ["shopping","culture","nature","cafe_tour","night_photo","healing","kpop","sns_hot"]
+  /** 여행 테마 */
+  const [themes, setThemes] = useState([]);
   const [hoveredTheme, setHoveredTheme] = useState(null);
 
   /** 대기 선호 */
-  const [waitTolerance, setWaitTolerance] = useState("medium"); // "low" | "medium" | "high"
+  const [waitTolerance, setWaitTolerance] = useState("medium");
   const [hoveredWait, setHoveredWait] = useState(null);
 
-  /** 여행 페이스 (여유/보통/알차게) */
-  const [pace, setPace] = useState("normal"); // relaxed | normal | tight
+  /** 여행 페이스 */
+  const [pace, setPace] = useState("normal");
 
   /** 이동 / 장소 옵션 */
-  const [maxLeg, setMaxLeg] = useState("60"); // 구간당 최대 이동시간(분)
-  const [numPlaces, setNumPlaces] = useState("6"); // 총 방문 장소 수
+  const [maxLeg, setMaxLeg] = useState("60");
+  const [numPlaces, setNumPlaces] = useState("6");
 
-  /** 시간 설정 (문자열로 관리 → 0 고정 문제 해결) */
+  /** 시간 설정 */
   const [startHour, setStartHour] = useState("9");
-  const [endHour, setEndHour] = useState("18"); // 24까지 허용
+  const [endHour, setEndHour] = useState("18");
 
-  /** 여행에 있어서 바라는 게 있나요? 도움말 호버 */
+  /** 도움말 상태 등 */
   const [showWishHelp, setShowWishHelp] = useState(false);
-
-  /** Send 버튼 호버 */
   const [isSendHover, setIsSendHover] = useState(false);
 
-  /** 네이버 검색 기반 POI (실제 장소 목록) */
+  /** POI / 가중치 / refine / 후보선택 상태 */
   const [searchPois, setSearchPois] = useState([]);
-  
-  /** 백엔드에서 받은 가중치 (체류시간 계산용) */
   const [weights, setWeights] = useState(null);
-  
-  /** refine API 호출용 상태 */
   const [refineLoading, setRefineLoading] = useState(false);
-
-  /** 후보 선택 관련 상태 */
-  const [candidatePOIs, setCandidatePOIs] = useState([]);      // 후보 POI 목록
-  const [showCandidateSelector, setShowCandidateSelector] = useState(false); // 선택 UI 표시
-  const [selectedPOIs, setSelectedPOIs] = useState([]);        // 선택된 POI 목록
-
-  const atlasSVG = <svg width="81" height="80" viewBox="0 0 81 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M1.85177 1.70053C-2.01905 5.62172 3.38207 17.2008 13.9549 27.6172C16.7705 30.3912 19.6698 32.804 22.4838 34.779C24.4335 32.6549 26.4871 30.526 28.6352 28.4097C30.9225 26.1563 33.2242 24.0083 35.5191 21.977C33.5113 19.1973 31.0567 16.3322 28.233 13.5503C18.1485 3.61503 6.99025 -1.68504 2.52734 1.15568C8.51232 -2.91174 23.9826 4.03375 40.6214 17.6421C57.1677 4.16466 72.5167 -2.69357 78.4726 1.354C74.0097 -1.48665 62.8516 3.81319 52.7672 13.7485C50.025 16.4501 47.6311 19.2303 45.6562 21.9345C47.8931 23.9198 50.1359 26.0155 52.365 28.2116C54.594 30.4076 56.7211 32.6173 58.7362 34.821C61.481 32.8753 64.3031 30.517 67.0453 27.8154C77.6181 17.3989 83.019 5.82004 79.1482 1.89885C79.1695 1.91913 79.1909 1.93934 79.2118 1.95999C84.5442 7.2135 77.5776 22.9647 63.2768 40.0003C76.968 56.3097 83.937 71.4417 79.8269 77.3119C82.7102 72.915 77.3308 61.9219 67.2464 51.9867C64.5 49.2809 61.6735 46.9196 58.9247 44.9722C56.8538 47.2444 54.6637 49.5238 52.365 51.7886C50.2056 53.916 48.0332 55.9492 45.866 57.8792C47.8392 60.5797 50.23 63.3558 52.9683 66.0536C63.5411 76.47 75.2938 81.7911 79.2739 77.9775C79.2533 77.9985 79.2328 78.0195 79.2118 78.0402C73.8816 83.2916 57.9044 76.4359 40.6211 62.3581C23.245 76.5693 7.14348 83.5142 1.78834 78.2383C1.76737 78.2177 1.74666 78.1968 1.72608 78.1758C5.70614 81.9894 17.4591 76.6682 28.0319 66.2517C30.8515 63.4738 33.3031 60.613 35.3094 57.837C33.084 55.8608 30.8528 53.7752 28.6352 51.5904C26.4175 49.4056 24.3006 47.2073 22.2946 45.0147C19.4769 46.9913 16.5734 49.4069 13.7538 52.1848C3.66932 62.1201 -1.71032 73.1133 1.17306 77.5102C-2.95371 71.6162 4.08824 56.3848 17.8895 39.9999C3.47653 22.8886 -3.56467 7.03569 1.78834 1.76186C1.8093 1.74121 1.83048 1.72081 1.85177 1.70053ZM41.0231 39.9856C42.8071 41.3867 45.8761 41.252 49.6044 39.8645C45.8236 38.4944 42.7415 38.434 41.0231 39.9856ZM40.4276 40.6682C39.2728 42.3605 39.3791 45.0626 40.5346 48.3198C41.6694 45.0217 41.7084 42.3106 40.4276 40.6682ZM40.537 30.9312C39.1286 34.6043 38.9921 37.6279 40.4141 39.3856C41.9889 37.6925 41.9277 34.6561 40.537 30.9312ZM31.9547 39.8668C35.2609 41.0053 38.0035 41.1099 39.7212 39.9722C38.0541 38.7105 35.3023 38.7489 31.9547 39.8668Z" fill="white"/>
-</svg>;
-
-
-  
-
+  const [candidatePOIs, setCandidatePOIs] = useState([]);
+  const [showCandidateSelector, setShowCandidateSelector] = useState(false);
+  const [selectedPOIs, setSelectedPOIs] = useState([]);
 
   /** 지도 초기화 */
   useEffect(() => {
@@ -191,13 +157,11 @@ export default function App() {
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // 기존 마커 제거
     seMarkersRef.current.forEach((m) => m.setMap(null));
     seMarkersRef.current = [];
 
     const map = mapRef.current;
 
-    // 출발·도착 동일 → 통합 마커 1개만
     if (sameStartEnd && startPoint?.lat && startPoint?.lon) {
       const pos = new window.naver.maps.LatLng(startPoint.lat, startPoint.lon);
 
@@ -239,11 +203,9 @@ export default function App() {
           },
         })
       );
-
-      return; // 통합 마커만 표시하고 종료
+      return;
     }
 
-    // 출발·도착이 서로 다를 때 → 각각 표시
     if (startPoint?.lat && startPoint?.lon) {
       const pos = new window.naver.maps.LatLng(startPoint.lat, startPoint.lon);
 
@@ -331,13 +293,12 @@ export default function App() {
     }
   }, [startPoint, endPoint, sameStartEnd, t]);
 
-  /** 필수 방문지 마커 + hover 시 이름 말풍선 */
+  /** 필수 방문지 마커 + hover 시 이름 말풍선 (ATLAS 로고 버전) */
   useEffect(() => {
     if (!mapRef.current) return;
 
     const map = mapRef.current;
 
-    // InfoWindow 하나만 만들어서 재사용
     if (!requiredInfoWindowRef.current) {
       requiredInfoWindowRef.current = new window.naver.maps.InfoWindow({
         backgroundColor: "transparent",
@@ -347,7 +308,6 @@ export default function App() {
     }
     const infoWindow = requiredInfoWindowRef.current;
 
-    // 기존 필수 방문지 마커 제거
     requiredMarkersRef.current.forEach((m) => m.setMap(null));
     requiredMarkersRef.current = [];
 
@@ -363,19 +323,27 @@ export default function App() {
         icon: {
           content: `
             <div style="
-              width: 14px;
-              height: 14px;
-              border-radius: 999px;
-              background: #7b2fff;
-              border: 2px solid #ffffff;
-              box-shadow: 0 4px 10px rgba(15,23,42,0.25);
               transform: translate(-50%, -50%);
-            "></div>
+              width: 30px;
+              height: 30px;
+              border-radius: 999px;
+              background: #f97316;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 10px rgba(249,115,22,0.45);
+            ">
+              <svg width="20" height="20" viewBox="0 0 81 80" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                  d="M1.85177 1.70053C-2.01905 5.62172 3.38207 17.2008 13.9549 27.6172C16.7705 30.3912 19.6698 32.804 22.4838 34.779C24.4335 32.6549 26.4871 30.526 28.6352 28.4097C30.9225 26.1563 33.2242 24.0083 35.5191 21.977C33.5113 19.1973 31.0567 16.3322 28.233 13.5503C18.1485 3.61503 6.99025 -1.68504 2.52734 1.15568C8.51232 -2.91174 23.9826 4.03375 40.6214 17.6421C57.1677 4.16466 72.5167 -2.69357 78.4726 1.354C74.0097 -1.48665 62.8516 3.81319 52.7672 13.7485C50.025 16.4501 47.6311 19.2303 45.6562 21.9345C47.8931 23.9198 50.1359 26.0155 52.365 28.2116C54.594 30.4076 56.7211 32.6173 58.7362 34.821C61.481 32.8753 64.3031 30.517 67.0453 27.8154C77.6181 17.3989 83.019 5.82004 79.1482 1.89885C79.1695 1.91913 79.1909 1.93934 79.2118 1.95999C84.5442 7.2135 77.5776 22.9647 63.2768 40.0003C76.968 56.3097 83.937 71.4417 79.8269 77.3119C82.7102 72.915 77.3308 61.9219 67.2464 51.9867C64.5 49.2809 61.6735 46.9196 58.9247 44.9722C56.8538 47.2444 54.6637 49.5238 52.365 51.7886C50.2056 53.916 48.0332 55.9492 45.866 57.8792C47.8392 60.5797 50.23 63.3558 52.9683 66.0536C63.5411 76.47 75.2938 81.7911 79.2739 77.9775C79.2533 77.9985 79.2328 78.0195 79.2118 78.0402C73.8816 83.2916 57.9044 76.4359 40.6211 62.3581C23.245 76.5693 7.14348 83.5142 1.78834 78.2383C1.76737 78.2177 1.74666 78.1968 1.72608 78.1758C5.70614 81.9894 17.4591 76.6682 28.0319 66.2517C30.8515 63.4738 33.3031 60.613 35.3094 57.837C33.084 55.8608 30.8528 53.7752 28.6352 51.5904C26.4175 49.4056 24.3006 47.2073 22.2946 45.0147C19.4769 46.9913 16.5734 49.4069 13.7538 52.1848C3.66932 62.1201 -1.71032 73.1133 1.17306 77.5102C-2.95371 71.6162 4.08824 56.3848 17.8895 39.9999C3.47653 22.8886 -3.56467 7.03569 1.78834 1.76186C1.8093 1.74121 1.83048 1.72081 1.85177 1.70053ZM41.0231 39.9856C42.8071 41.3867 45.8761 41.252 49.6044 39.8645C45.8236 38.4944 42.7415 38.434 41.0231 39.9856ZM40.4276 40.6682C39.2728 42.3605 39.3791 45.0626 40.5346 48.3198C41.6694 45.0217 41.7084 42.3106 40.4276 40.6682ZM40.537 30.9312C39.1286 34.6043 38.9921 37.6279 40.4141 39.3856C41.9889 37.6925 41.9277 34.6561 40.537 30.9312ZM31.9547 39.8668C35.2609 41.0053 38.0035 41.1099 39.7212 39.9722C38.0541 38.7105 35.3023 38.7489 31.9547 39.8668Z"
+                  fill="#ffffff"
+                />
+              </svg>
+            </div>
           `,
         },
       });
 
-      // 마우스 올렸을 때: 바로 열기
       window.naver.maps.Event.addListener(marker, "mouseover", () => {
         infoWindow.setContent(`
           <div style="
@@ -394,7 +362,6 @@ export default function App() {
         infoWindow.open(map, marker);
       });
 
-      // 마우스 뗐을 때: 바로 닫기
       window.naver.maps.Event.addListener(marker, "mouseout", () => {
         infoWindow.close();
       });
@@ -403,15 +370,13 @@ export default function App() {
     });
   }, [requiredStops]);
 
-  /** 경로 마커 + 폴리라인 */
+  /** 경로 마커 + 폴리라인 (필수 방문지는 제외하고, 끝에서 다시 ATLAS 마커로 올리기) */
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // 기존 경로 마커 제거
     planMarkersRef.current.forEach((m) => m.setMap(null));
     planMarkersRef.current = [];
 
-    // 기존 폴리라인 제거
     if (polylineRef.current) {
       polylineRef.current.setMap(null);
       polylineRef.current = null;
@@ -427,42 +392,40 @@ export default function App() {
       const pos = new window.naver.maps.LatLng(c.lat, c.lon);
       coords.push(pos);
 
-      if (type === "start" || type === "end") {
-    return;
-  }
+      // 출발 / 도착 / 필수 방문지는 여기서 일반 ATLAS 마커 생략
+      if (type === "start" || type === "end" || c.category === "required") {
+        return;
+      }
 
-      // 🔹 나머지(일반 POI들)만 ATLAS 로고 마커 사용
-  planMarkersRef.current.push(
-    new window.naver.maps.Marker({
-      map,
-      position: pos,
-      title: c.poi?.name,
-      icon: {
-        content: `
-          <div style="
-            transform: translate(-50%, -50%);
-            width: 30px;
-            height: 30px;
-            border-radius: 999px;
-            background: #5e4bdbff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(40, 83, 183, 0.4);
-          ">
-            <svg width="20" height="20" viewBox="0 0 81 80" xmlns="http://www.w3.org/2000/svg">
-              <path fill-rule="evenodd" clip-rule="evenodd"
-                d="M1.85177 1.70053C-2.01905 5.62172 3.38207 17.2008 13.9549 27.6172C16.7705 30.3912 19.6698 32.804 22.4838 34.779C24.4335 32.6549 26.4871 30.526 28.6352 28.4097C30.9225 26.1563 33.2242 24.0083 35.5191 21.977C33.5113 19.1973 31.0567 16.3322 28.233 13.5503C18.1485 3.61503 6.99025 -1.68504 2.52734 1.15568C8.51232 -2.91174 23.9826 4.03375 40.6214 17.6421C57.1677 4.16466 72.5167 -2.69357 78.4726 1.354C74.0097 -1.48665 62.8516 3.81319 52.7672 13.7485C50.025 16.4501 47.6311 19.2303 45.6562 21.9345C47.8931 23.9198 50.1359 26.0155 52.365 28.2116C54.594 30.4076 56.7211 32.6173 58.7362 34.821C61.481 32.8753 64.3031 30.517 67.0453 27.8154C77.6181 17.3989 83.019 5.82004 79.1482 1.89885C79.1695 1.91913 79.1909 1.93934 79.2118 1.95999C84.5442 7.2135 77.5776 22.9647 63.2768 40.0003C76.968 56.3097 83.937 71.4417 79.8269 77.3119C82.7102 72.915 77.3308 61.9219 67.2464 51.9867C64.5 49.2809 61.6735 46.9196 58.9247 44.9722C56.8538 47.2444 54.6637 49.5238 52.365 51.7886C50.2056 53.916 48.0332 55.9492 45.866 57.8792C47.8392 60.5797 50.23 63.3558 52.9683 66.0536C63.5411 76.47 75.2938 81.7911 79.2739 77.9775C79.2533 77.9985 79.2328 78.0195 79.2118 78.0402C73.8816 83.2916 57.9044 76.4359 40.6211 62.3581C23.245 76.5693 7.14348 83.5142 1.78834 78.2383C1.76737 78.2177 1.74666 78.1968 1.72608 78.1758C5.70614 81.9894 17.4591 76.6682 28.0319 66.2517C30.8515 63.4738 33.3031 60.613 35.3094 57.837C33.084 55.8608 30.8528 53.7752 28.6352 51.5904C26.4175 49.4056 24.3006 47.2073 22.2946 45.0147C19.4769 46.9913 16.5734 49.4069 13.7538 52.1848C3.66932 62.1201 -1.71032 73.1133 1.17306 77.5102C-2.95371 71.6162 4.08824 56.3848 17.8895 39.9999C3.47653 22.8886 -3.56467 7.03569 1.78834 1.76186C1.8093 1.74121 1.83048 1.72081 1.85177 1.70053ZM41.0231 39.9856C42.8071 41.3867 45.8761 41.252 49.6044 39.8645C45.8236 38.4944 42.7415 38.434 41.0231 39.9856ZM40.4276 40.6682C39.2728 42.3605 39.3791 45.0626 40.5346 48.3198C41.6694 45.0217 41.7084 42.3106 40.4276 40.6682ZM40.537 30.9312C39.1286 34.6043 38.9921 37.6279 40.4141 39.3856C41.9889 37.6925 41.9277 34.6561 40.537 30.9312ZM31.9547 39.8668C35.2609 41.0053 38.0035 41.1099 39.7212 39.9722C38.0541 38.7105 35.3023 38.7489 31.9547 39.8668Z"
-                fill="#ffffff"
-              />
-            </svg>
-          </div>
-        `,
-      },
-    })
-  );
-
-
+      planMarkersRef.current.push(
+        new window.naver.maps.Marker({
+          map,
+          position: pos,
+          title: c.poi?.name,
+          icon: {
+            content: `
+              <div style="
+                transform: translate(-50%, -50%);
+                width: 30px;
+                height: 30px;
+                border-radius: 999px;
+                background: #5e4bdbff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 4px 10px rgba(40, 83, 183, 0.4);
+              ">
+                <svg width="20" height="20" viewBox="0 0 81 80" xmlns="http://www.w3.org/2000/svg">
+                  <path fill-rule="evenodd" clip-rule="evenodd"
+                    d="M1.85177 1.70053C-2.01905 5.62172 3.38207 17.2008 13.9549 27.6172C16.7705 30.3912 19.6698 32.804 22.4838 34.779C24.4335 32.6549 26.4871 30.526 28.6352 28.4097C30.9225 26.1563 33.2242 24.0083 35.5191 21.977C33.5113 19.1973 31.0567 16.3322 28.233 13.5503C18.1485 3.61503 6.99025 -1.68504 2.52734 1.15568C8.51232 -2.91174 23.9826 4.03375 40.6214 17.6421C57.1677 4.16466 72.5167 -2.69357 78.4726 1.354C74.0097 -1.48665 62.8516 3.81319 52.7672 13.7485C50.025 16.4501 47.6311 19.2303 45.6562 21.9345C47.8931 23.9198 50.1359 26.0155 52.365 28.2116C54.594 30.4076 56.7211 32.6173 58.7362 34.821C61.481 32.8753 64.3031 30.517 67.0453 27.8154C77.6181 17.3989 83.019 5.82004 79.1482 1.89885C79.1695 1.91913 79.1909 1.93934 79.2118 1.95999C84.5442 7.2135 77.5776 22.9647 63.2768 40.0003C76.968 56.3097 83.937 71.4417 79.8269 77.3119C82.7102 72.915 77.3308 61.9219 67.2464 51.9867C64.5 49.2809 61.6735 46.9196 58.9247 44.9722C56.8538 47.2444 54.6637 49.5238 52.365 51.7886C50.2056 53.916 48.0332 55.9492 45.866 57.8792C47.8392 60.5797 50.23 63.3558 52.9683 66.0536C63.5411 76.47 75.2938 81.7911 79.2739 77.9775C79.2533 77.9985 79.2328 78.0195 79.2118 78.0402C73.8816 83.2916 57.9044 76.4359 40.6211 62.3581C23.245 76.5693 7.14348 83.5142 1.78834 78.2383C1.76737 78.2177 1.74666 78.1968 1.72608 78.1758C5.70614 81.9894 17.4591 76.6682 28.0319 66.2517C30.8515 63.4738 33.3031 60.613 35.3094 57.837C33.084 55.8608 30.8528 53.7752 28.6352 51.5904C26.4175 49.4056 24.3006 47.2073 22.2946 45.0147C19.4769 46.9913 16.5734 49.4069 13.7538 52.1848C3.66932 62.1201 -1.71032 73.1133 1.17306 77.5102C-2.95371 71.6162 4.08824 56.3848 17.8895 39.9999C3.47653 22.8886 -3.56467 7.03569 1.78834 1.76186C1.8093 1.74121 1.83048 1.72081 1.85177 1.70053ZM41.0231 39.9856C42.8071 41.3867 45.8761 41.252 49.6044 39.8645C45.8236 38.4944 42.7415 38.434 41.0231 39.9856ZM40.4276 40.6682C39.2728 42.3605 39.3791 45.0626 40.5346 48.3198C41.6694 45.0217 41.7084 42.3106 40.4276 40.6682ZM40.537 30.9312C39.1286 34.6043 38.9921 37.6279 40.4141 39.3856C41.9889 37.6925 41.9277 34.6561 40.537 30.9312ZM31.9547 39.8668C35.2609 41.0053 38.0035 41.1099 39.7212 39.9722C38.0541 38.7105 35.3023 38.7489 31.9547 39.8668Z"
+                    fill="#ffffff"
+                  />
+                </svg>
+              </div>
+            `,
+          },
+        })
+      );
     });
 
     if (coords.length >= 2) {
@@ -477,19 +440,56 @@ export default function App() {
       coords.forEach((c) => bounds.extend(c));
       map.fitBounds(bounds);
     }
-  }, [plan, t]);
 
-  /**
-   * 네이버 + Gemini 기반 POI 가져오기
-   * → /api/search-with-pref 사용
+    // 경로/폴리라인 그린 뒤, 필수 방문지 마커를 다시 ATLAS 로고로 올려서 표시
+    requiredMarkersRef.current.forEach((m) => m.setMap(null));
+    requiredMarkersRef.current = [];
+
+    (requiredStops || []).forEach((p) => {
+      if (!p.lat || !p.lon) return;
+      const pos = new window.naver.maps.LatLng(p.lat, p.lon);
+
+      const marker = new window.naver.maps.Marker({
+        map,
+        position: pos,
+        title: p.name,
+        icon: {
+          content: `
+            <div style="
+              transform: translate(-50%, -50%);
+              width: 30px;
+              height: 30px;
+              border-radius: 999px;
+              background: #f97316;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 4px 10px rgba(249,115,22,0.45);
+            ">
+              <svg width="20" height="20" viewBox="0 0 81 80" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                  d="M1.85177 1.70053C-2.01905 5.62172 3.38207 17.2008 13.9549 27.6172C16.7705 30.3912 19.6698 32.804 22.4838 34.779C24.4335 32.6549 26.4871 30.526 28.6352 28.4097C30.9225 26.1563 33.2242 24.0083 35.5191 21.977C33.5113 19.1973 31.0567 16.3322 28.233 13.5503C18.1485 3.61503 6.99025 -1.68504 2.52734 1.15568C8.51232 -2.91174 23.9826 4.03375 40.6214 17.6421C57.1677 4.16466 72.5167 -2.69357 78.4726 1.354C74.0097 -1.48665 62.8516 3.81319 52.7672 13.7485C50.025 16.4501 47.6311 19.2303 45.6562 21.9345C47.8931 23.9198 50.1359 26.0155 52.365 28.2116C54.594 30.4076 56.7211 32.6173 58.7362 34.821C61.481 32.8753 64.3031 30.517 67.0453 27.8154C77.6181 17.3989 83.019 5.82004 79.1482 1.89885C79.1695 1.91913 79.1909 1.93934 79.2118 1.95999C84.5442 7.2135 77.5776 22.9647 63.2768 40.0003C76.968 56.3097 83.937 71.4417 79.8269 77.3119C82.7102 72.915 77.3308 61.9219 67.2464 51.9867C64.5 49.2809 61.6735 46.9196 58.9247 44.9722C56.8538 47.2444 54.6637 49.5238 52.365 51.7886C50.2056 53.916 48.0332 55.9492 45.866 57.8792C47.8392 60.5797 50.23 63.3558 52.9683 66.0536C63.5411 76.47 75.2938 81.7911 79.2739 77.9775C79.2533 77.9985 79.2328 78.0195 79.2118 78.0402C73.8816 83.2916 57.9044 76.4359 40.6211 62.3581C23.245 76.5693 7.14348 83.5142 1.78834 78.2383C1.76737 78.2177 1.74666 78.1968 1.72608 78.1758C5.70614 81.9894 17.4591 76.6682 28.0319 66.2517C30.8515 63.4738 33.3031 60.613 35.3094 57.837C33.084 55.8608 30.8528 53.7752 28.6352 51.5904C26.4175 49.4056 24.3006 47.2073 22.2946 45.0147C19.4769 46.9913 16.5734 49.4069 13.7538 52.1848C3.66932 62.1201 -1.71032 73.1133 1.17306 77.5102C-2.95371 71.6162 4.08824 56.3848 17.8895 39.9999C3.47653 22.8886 -3.56467 7.03569 1.78834 1.76186C1.8093 1.74121 1.83048 1.72081 1.85177 1.70053ZM41.0231 39.9856C42.8071 41.3867 45.8761 41.252 49.6044 39.8645C45.8236 38.4944 42.7415 38.434 41.0231 39.9856ZM40.4276 40.6682C39.2728 42.3605 39.3791 45.0626 40.5346 48.3198C41.6694 45.0217 41.7084 42.3106 40.4276 40.6682ZM40.537 30.9312C39.1286 34.6043 38.9921 37.6279 40.4141 39.3856C41.9889 37.6925 41.9277 34.6561 40.537 30.9312ZM31.9547 39.8668C35.2609 41.0053 38.0035 41.1099 39.7212 39.9722C38.0541 38.7105 35.3023 38.7489 31.9547 39.8668Z"
+                  fill="#ffffff"
+                />
+              </svg>
+            </div>
+          `,
+        },
+      });
+
+      requiredMarkersRef.current.push(marker);
+    });
+  }, [plan, requiredStops, t]);
+
+  /** 아래부터는 나머지 함수들(fetchPoisFromServer, fetchRefinedPois, onSearchCandidates, onConfirmSelection 등)
+   *  기존 코드에서 그대로 유지 (이미 잘 동작하고 있어서 생략하지 않고 그대로 사용)
+   *  ─────────────────────────────────────────────────────────────
    */
+
   const fetchPoisFromServer = async () => {
     if (!startPoint?.name) return [];
 
-    // 1️⃣ wishLog를 복사해서 작업용 배열 생성
     const trimmedLog = [...wishLog];
-
-    // 2️⃣ 마지막이 assistant라면 잘라낸다
     while (
       trimmedLog.length > 0 &&
       trimmedLog[trimmedLog.length - 1].role === "assistant"
@@ -497,23 +497,29 @@ export default function App() {
       trimmedLog.pop();
     }
 
-    // 3️⃣ user / assistant 대화 전체를 문자열로 변환 (마지막 assistant는 제거된 상태)
     const fullConversation = trimmedLog
       .map((msg) => {
         const speaker = msg.role === "user" ? "User" : "Assistant";
         return `${speaker}: ${msg.text}`;
       })
       .join("\n\n");
-    
-    // 4️⃣ 대화가 완전 비어 있으면 placeholder 사용
+
     const travelMessage =
       fullConversation && fullConversation.trim().length > 0
         ? fullConversation
         : t("wish.placeholder");
 
-    // ✅ 디버깅 로그
     console.log("📤 백엔드로 보내는 메시지:", travelMessage);
-    console.log("📤 컨텍스트:", { breakfast, lunch, dinner, cafe, dietPrefs, themes, pace });
+    console.log("📤 컨텍스트:", {
+      breakfast,
+      lunch,
+      dinner,
+      cafe,
+      dietPrefs,
+      themes,
+      pace,
+    });
+
     try {
       const res = await fetch("/api/search-with-pref", {
         method: "POST",
@@ -521,9 +527,7 @@ export default function App() {
         body: JSON.stringify({
           baseArea: "서울",
           message: travelMessage,
-          lang: i18n.language,   // 🔹 ko / en / ja
-          // 🔹 출발지/도착지를 서버로 같이 보냄 (번역용)
-          // 🔹 name이 없으면 title/placeName/address에서 가져와서 채워 넣기
+          lang: i18n.language,
           startPoint: startPoint
             ? {
                 ...startPoint,
@@ -536,7 +540,6 @@ export default function App() {
                   "",
               }
             : null,
-
           endPoint: endPoint
             ? {
                 ...endPoint,
@@ -548,7 +551,7 @@ export default function App() {
                   endPoint.address ||
                   "",
               }
-          : null,
+            : null,
           context: {
             breakfast,
             lunch,
@@ -579,18 +582,15 @@ export default function App() {
         pois,
         weights: weightsFromServer,
         biasReport,
-        // 🔹 백엔드에서 번역해서 보내준 출발지/도착지/필수 방문지
         startPoint: serverStartPoint,
         endPoint: serverEndPoint,
         requiredStops: serverRequiredStops,
       } = data || {};
-      
-      // weights 저장 (체류시간 계산용)
+
       if (weightsFromServer) {
         setWeights(weightsFromServer);
       }
 
-      // 편향 리포트가 있으면 챗봇 로그에 안내 메시지 추가
       if (biasReport?.isBiased) {
         const issuesText = (biasReport.issues || []).join("\n• ");
         const suggestionsText = (biasReport.suggestions || []).join("\n");
@@ -605,17 +605,12 @@ export default function App() {
         ]);
       }
 
-      // 🔹  출발지 / 도착지 / 필수 방문지에 번역 정보 반영
       if (serverStartPoint) {
         setStartPoint((prev) => {
-          const base = prev || {}; // 기존에 LocationSearch에서 선택한 값
-
+          const base = prev || {};
           return {
-            // 1) 기존 값 유지
             ...base,
-            // 2) 백엔드에서 온 번역 필드로 덮어쓰기
             ...serverStartPoint,
-            // 3) 좌표는 기존 값 우선
             lat: base.lat ?? serverStartPoint.lat ?? null,
             lon: base.lon ?? serverStartPoint.lon ?? null,
           };
@@ -625,7 +620,6 @@ export default function App() {
       if (serverEndPoint) {
         setEndPoint((prev) => {
           const base = prev || {};
-
           return {
             ...base,
             ...serverEndPoint,
@@ -638,11 +632,9 @@ export default function App() {
       if (Array.isArray(serverRequiredStops) && serverRequiredStops.length) {
         setRequiredStops((prev) => {
           if (!prev || !prev.length) return prev;
-
           return prev.map((stop, idx) => {
             const tStop = serverRequiredStops[idx];
             if (!tStop) return stop;
-
             return {
               ...stop,
               ...tStop,
@@ -653,60 +645,55 @@ export default function App() {
         });
       }
 
-
-      // Naver local API raw → routePlanner용 형식으로 변환
       const converted =
-  (pois || [])
-    .map((p, idx) => {
-      // 원본 한글 이름 (HTML 태그 제거)
-      const originalName = String(p.title || p.name || "")
-        .replace(/<[^>]+>/g, "")
-        .trim();
+        (pois || [])
+          .map((p, idx) => {
+            const originalName = String(p.title || p.name || "")
+              .replace(/<[^>]+>/g, "")
+              .trim();
+            const translatedName = String(p.titleTranslated || "")
+              .replace(/<[^>]+>/g, "")
+              .trim();
+            const lat = p.mapy ? parseFloat(p.mapy) / 1e7 : null;
+            const lon = p.mapx ? parseFloat(p.mapx) / 1e7 : null;
+            if (!lat || !lon) return null;
 
-      // 번역된 이름 (백엔드가 붙여준 필드, 없으면 빈 문자열)
-      const translatedName = String(p.titleTranslated || "")
-        .replace(/<[^>]+>/g, "")
-        .trim();
-      const lat = p.mapy ? parseFloat(p.mapy) / 1e7 : null;
-      const lon = p.mapx ? parseFloat(p.mapx) / 1e7 : null;
-      if (!lat || !lon) return null;
+            const originalCategory = String(
+              p.category || p.categoryType || ""
+            ).trim();
+            const translatedCategory = String(
+              p.categoryTranslated || ""
+            ).trim();
 
-      const originalCategory = String(p.category || p.categoryType || "").trim();
-      const translatedCategory = String(p.categoryTranslated || "").trim();
+            const categoryType = p.categoryType || "poi";
+            const isFood =
+              categoryType === "restaurant" ||
+              categoryType === "cafe" ||
+              /카페|cafe|커피|디저트|음식점|식당|맛집|레스토랑/i.test(
+                p.category || ""
+              );
 
-      const categoryType = p.categoryType || "poi";
-      const isFood =
-        categoryType === "restaurant" ||
-        categoryType === "cafe" ||
-        /카페|cafe|커피|디저트|음식점|식당|맛집|레스토랑/i.test(
-          p.category || ""
-        );
-
-        return {
-          id: idx,
-          // 🔹 이름은 일단 둘 다 저장해 둔다
-          nameKo: originalName,
-          nameTranslated: translatedName,
-          // 기본 name은 번역 우선, 없으면 한글
-          name: translatedName || originalName,
-          address: p.roadAddress || p.address,
-          lat,
-          lon,
-          categoryKo: originalCategory,
-          categoryTranslated: translatedCategory,
-          category: translatedCategory || originalCategory,
-          rating: p.rating ? Number(p.rating) : 4.0,
-          stay_time: 60,
-          diet_tags: [],
-          categoryType,  // 🔹 식당/카페/기타
-          isFood,        // 🔹 음식 관련 여부
-          _raw: p,
-          _prefs: prefs,
-        };
-      })
-      .filter(Boolean) || [];
-
-
+            return {
+              id: idx,
+              nameKo: originalName,
+              nameTranslated: translatedName,
+              name: translatedName || originalName,
+              address: p.roadAddress || p.address,
+              lat,
+              lon,
+              categoryKo: originalCategory,
+              categoryTranslated: translatedCategory,
+              category: translatedCategory || originalCategory,
+              rating: p.rating ? Number(p.rating) : 4.0,
+              stay_time: 60,
+              diet_tags: [],
+              categoryType,
+              isFood,
+              _raw: p,
+              _prefs: prefs,
+            };
+          })
+          .filter(Boolean) || [];
 
       setSearchPois(converted);
       return converted;
@@ -716,18 +703,11 @@ export default function App() {
     }
   };
 
-  /** 시간 → 분 변환 헬퍼 (예: 9 → 540) */
   const hourToMinutes = (h) => {
     const n = Math.min(24, Math.max(0, Number(h) || 0));
     return n * 60;
   };
 
-  /**
-   * 앵커 기반 재추천 API 호출 (/api/route/refine)
-   * @param {Object} anchor - { name, lat, lon, category, rating }
-   * @param {Array<string>} dislikedNames - 싫어요 한 장소 이름 목록
-   * @returns {Promise<Array>} 추천된 POI 배열
-   */
   const fetchRefinedPois = async (anchor, dislikedNames = []) => {
     if (!anchor || !anchor.lat || !anchor.lon) {
       console.error("❌ anchor 정보가 없습니다.");
@@ -777,7 +757,6 @@ export default function App() {
       const data = await res.json();
       const { pois } = data || {};
 
-      // Naver local API raw → routePlanner용 형식으로 변환
       const converted = (pois || [])
         .map((p, idx) => {
           const name = (p.title || "").replace(/<[^>]+>/g, "");
@@ -806,7 +785,7 @@ export default function App() {
             categoryType,
             isFood,
             _raw: p,
-            _isRefined: true, // refine으로 추가된 POI 표시
+            _isRefined: true,
           };
         })
         .filter(Boolean);
@@ -820,7 +799,6 @@ export default function App() {
     }
   };
 
-  /** 🔍 1단계: 후보 검색 */
   const onSearchCandidates = async () => {
     if (!startPoint || !endPoint) {
       alert(t("alert.need_start_end"));
@@ -830,7 +808,6 @@ export default function App() {
     setStatusKey("status.generating");
 
     try {
-      // 백엔드에서 POI 후보 가져오기
       const basePOIs = await fetchPoisFromServer();
       setSearchPois(basePOIs);
 
@@ -838,28 +815,30 @@ export default function App() {
         setStatusKey("status.no_pois");
         return;
       }
-      // ✅ 디버깅 로그
+
       console.log("🔍 검색된 후보 POI:", basePOIs.length);
       console.log("🔍 카테고리별:", {
-        attractions: basePOIs.filter(p => p.categoryType === "poi").length,
-        restaurants: basePOIs.filter(p => p.categoryType === "restaurant").length,
-        cafes: basePOIs.filter(p => p.categoryType === "cafe").length,
+        attractions: basePOIs.filter((p) => p.categoryType === "poi").length,
+        restaurants: basePOIs.filter((p) => p.categoryType === "restaurant")
+          .length,
+        cafes: basePOIs.filter((p) => p.categoryType === "cafe").length,
       });
 
       setCandidatePOIs(basePOIs);
       setShowCandidateSelector(true);
-      setStatusKey(""); // 상태 초기화
-
+      setStatusKey("");
     } catch (e) {
       console.error(e);
       setStatusKey("status.error");
     }
   };
 
-  /** ✅ 2단계: 선택 완료 후 일정 생성 */
   const onConfirmSelection = async (selected) => {
-    // ✅ 디버깅 로그
-    console.log("✅ 사용자가 선택한 POI:", selected.length, selected.map(p => p.name || p.title));
+    console.log(
+      "✅ 사용자가 선택한 POI:",
+      selected.length,
+      selected.map((p) => p.name || p.title)
+    );
 
     setShowCandidateSelector(false);
     setSelectedPOIs(selected);
@@ -876,21 +855,16 @@ export default function App() {
     const maxLegNum = Math.max(5, Number(maxLeg) || 0);
 
     try {
-      // ✅ 수정: 중복 제거 강화
-
-          // ✅ 사용자가 선택한 POI는 모두 "무조건 포함" 플래그를 달아서 보낸다
-    const allPois = selected.map((p) => ({
-      ...p,
-      isMustVisit: true,   // 🔥 이 한 줄이 핵심
-    }));
-
+      const allPois = selected.map((p) => ({
+        ...p,
+        isMustVisit: true,
+      }));
 
       if (!allPois.length) {
         setStatusKey("status.no_pois");
         return;
       }
 
-      // 경로 최적화
       const opt = optimizeRoute(
         allPois,
         startPoint,
@@ -902,12 +876,13 @@ export default function App() {
         weights || {},
         { breakfast, lunch, dinner, cafe }
       );
-      // ✅ 디버깅 로그
-      console.log("🗺️ 경로 최적화 결과:", { routeArray: opt.routeArray?.length, route: opt.route });
 
-      // 시간별 일정 생성
+      console.log("🗺️ 경로 최적화 결과:", {
+        routeArray: opt.routeArray?.length,
+        route: opt.route,
+      });
+
       const schedule = generateSchedule(
-
         opt.routeArray,
         opt.route,
         opt.waits,
@@ -926,59 +901,47 @@ export default function App() {
         }
       );
 
-      // ✅ 디버깅 로그
       console.log("📅 생성된 일정:", schedule?.length, schedule);
 
       setPlan({ ...opt, schedule });
       setStatusKey("status.success");
-
-
     } catch (e) {
       console.error(e);
       setStatusKey("status.error");
     }
   };
 
-  /** ❌ 후보 선택 취소 */
   const onCancelSelection = () => {
     setShowCandidateSelector(false);
     setCandidatePOIs([]);
     setStatusKey("");
   };
-  /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
-    /** 🎲 추천된 후보들 중에서 자동으로 골라주는 함수 */
+
   const autoSelectFromCandidates = () => {
     if (!candidatePOIs || candidatePOIs.length === 0) {
       alert(t("status.no_pois"));
       return;
     }
 
-    // 전체에서 최대 몇 개까지 넣을지 (기존 numPlaces 활용)
     const maxCount = Math.max(1, Number(numPlaces) || 6);
 
     const restaurants = candidatePOIs.filter(
       (p) => p.categoryType === "restaurant"
     );
-    const cafes = candidatePOIs.filter(
-      (p) => p.categoryType === "cafe"
-    );
+    const cafesList = candidatePOIs.filter((p) => p.categoryType === "cafe");
     const attractions = candidatePOIs.filter(
       (p) => !p.categoryType || p.categoryType === "poi"
     );
 
     const selected = [];
-    const used = new Set(); // 같은 장소 중복 방지
-
+    const used = new Set();
     const keyOf = (p) => `${p.lat}:${p.lon}:${p.name || p.title}`;
-
     const markUsed = (p) => {
       used.add(keyOf(p));
     };
-
     const pickRandomFrom = (list) => {
       const available = list.filter((p) => !used.has(keyOf(p)));
       if (!available.length) return null;
-
       const idx = Math.floor(Math.random() * available.length);
       const chosen = available[idx];
       selected.push(chosen);
@@ -986,13 +949,8 @@ export default function App() {
       return chosen;
     };
 
-    // 🍱 식당: 점심/저녁 설정을 참고하되, 최소/최대 개수는 이렇게 정리
-    //  - 점심/저녁 둘 다 켜져 있으면 ideally 2개
-    //  - 둘 중 하나만 켜져 있으면 ideally 1개
-    //  - 둘 다 꺼져 있어도 후보에 식당 많으면 2개까지는 뽑아줌
     const idealByToggle = (lunch ? 1 : 0) + (dinner ? 1 : 0);
-    const targetRestaurantCount =
-      idealByToggle > 0 ? idealByToggle : 2; // 기본적으로 2개까지 시도
+    const targetRestaurantCount = idealByToggle > 0 ? idealByToggle : 2;
     const actualRestaurantCount = Math.min(
       targetRestaurantCount,
       restaurants.length
@@ -1003,7 +961,6 @@ export default function App() {
       if (!picked) break;
     }
 
-    // 나머지 슬롯은 관광지 위주로 채우고, 부족하면 카페/음식점 순으로 채우기
     let remaining = maxCount - selected.length;
 
     while (remaining > 0) {
@@ -1012,16 +969,14 @@ export default function App() {
       if (attractions.length > 0) {
         picked = pickRandomFrom(attractions);
       }
-
-      if (!picked && cafes.length > 0) {
-        picked = pickRandomFrom(cafes);
+      if (!picked && cafesList.length > 0) {
+        picked = pickRandomFrom(cafesList);
       }
-
       if (!picked && restaurants.length > 0) {
         picked = pickRandomFrom(restaurants);
       }
+      if (!picked) break;
 
-      if (!picked) break; // 더 이상 뽑을 게 없으면 종료
       remaining -= 1;
     }
 
@@ -1032,124 +987,113 @@ export default function App() {
 
     console.log("🎲 자동 선택된 POI:", {
       total: selected.length,
-      restaurants: selected.filter((p) => p.categoryType === "restaurant").length,
+      restaurants: selected.filter((p) => p.categoryType === "restaurant")
+        .length,
       cafes: selected.filter((p) => p.categoryType === "cafe").length,
       attractions: selected.filter(
         (p) => !p.categoryType || p.categoryType === "poi"
       ).length,
     });
 
-    // 수동 선택이랑 똑같이 기존 로직 재사용
     onConfirmSelection(selected);
   };
 
+  const handleSendWish = async () => {
+    const text = wishText.trim();
+    if (!text) return;
 
-/** 🗨 여행 취향 입력 SEND 버튼 핸들러 (Gemini 백엔드 자리 포함) */
-const handleSendWish = async () => {
-  const text = wishText.trim();
-  if (!text) return;
+    const userTurn =
+      wishLog.filter((msg) => msg.role === "user").length + 1;
 
-  // 1️⃣ 이번이 몇 번째 유저 발화인지 계산 (1부터 시작)
-  const userTurn =
-    wishLog.filter((msg) => msg.role === "user").length + 1;
+    setWishLog((prev) => [
+      ...prev,
+      { id: Date.now(), role: "user", text },
+    ]);
 
-  // 2️⃣ 유저 메시지를 먼저 로그에 추가
-  setWishLog((prev) => [
-    ...prev,
-    { id: Date.now(), role: "user", text },
-  ]);
+    setWishText("");
 
-  // 3️⃣ 입력창은 비움 (대신 wishLog에 기록이 남아 있음)
-  setWishText("");
-
-  try {
-    const res = await fetch("/api/travel-wish", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      const res = await fetch("/api/travel-wish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           message: text,
           context: {
-          breakfast,
-          lunch,
-          dinner,
-          cafe,
-          dietPrefs,
-          waitTolerance,
-          transportMode,
-          maxLeg,
-          numPlaces,
-          startHour,
-          endHour,
-          themes,
-          requiredStops,
-          pace,
-          // 🔴 여기! turn 정보를 함께 보냄
-          turn: userTurn,
+            breakfast,
+            lunch,
+            dinner,
+            cafe,
+            dietPrefs,
+            waitTolerance,
+            transportMode,
+            maxLeg,
+            numPlaces,
+            startHour,
+            endHour,
+            themes,
+            requiredStops,
+            pace,
+            turn: userTurn,
           },
-      }),
-    });
+        }),
+      });
 
-    // 4️⃣ 응답 content-type에 따라 파싱
-    const contentType = res.headers.get("content-type");
-    let data = null;
+      const contentType = res.headers.get("content-type");
+      let data = null;
 
-    if (contentType && contentType.includes("application/json")) {
-      data = await res.json();
-    } else {
-      const rawText = await res.text();
-      data = { raw: rawText };
-    }
+      if (contentType && contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const rawText = await res.text();
+        data = { raw: rawText };
+      }
 
-    // 5️⃣ 에러 응답 → assistant 말풍선으로 보여주기
-    if (!res.ok) {
-      console.error("❌ /api/travel-wish 상태코드:", res.status, data);
+      if (!res.ok) {
+        console.error("❌ /api/travel-wish 상태코드:", res.status, data);
+
+        setWishLog((prev) => [
+          ...prev,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            text:
+              `서버 응답에 문제가 있어요 (status ${res.status}).\n` +
+              (data?.error
+                ? `에러 메시지: ${data.error}`
+                : data?.raw
+                ? `응답 내용: ${data.raw}`
+                : "자세한 정보는 콘솔을 확인해주세요."),
+          },
+        ]);
+        return;
+      }
 
       setWishLog((prev) => [
         ...prev,
         {
-          id: Date.now() + 1,
+          id: Date.now() + 2,
           role: "assistant",
           text:
-            `서버 응답에 문제가 있어요 (status ${res.status}).\n` +
-            (data?.error
-              ? `에러 메시지: ${data.error}`
-              : data?.raw
-              ? `응답 내용: ${data.raw}`
-              : "자세한 정보는 콘솔을 확인해주세요."),
+            data?.reply ??
+            "여행 취향을 잘 받았어요! 일정에 반영해 볼게요 :)",
         },
       ]);
-      return;
+    } catch (err) {
+      console.error("❌ handleSendWish 에러:", err);
+
+      setWishLog((prev) => [
+        ...prev,
+        {
+          id: Date.now() + 3,
+          role: "assistant",
+          text:
+            "선호 분석 중 알 수 없는 오류가 발생했어요 🥲\n" +
+            "브라우저 콘솔과 서버 로그를 함께 확인해 주세요.",
+        },
+      ]);
     }
+  };
 
-    // 6️⃣ 정상 응답 → Gemini 답변을 assistant 말풍선으로 추가
-    setWishLog((prev) => [
-      ...prev,
-      {
-        id: Date.now() + 2,
-        role: "assistant",
-        text:
-          data?.reply ??
-          "여행 취향을 잘 받았어요! 일정에 반영해 볼게요 :)",
-      },
-    ]);
-  } catch (err) {
-    console.error("❌ handleSendWish 에러:", err);
-
-    // 7️⃣ 네트워크/예외 에러도 말풍선으로 알려주기
-    setWishLog((prev) => [
-      ...prev,
-      {
-        id: Date.now() + 3,
-        role: "assistant",
-        text:
-          "선호 분석 중 알 수 없는 오류가 발생했어요 🥲\n" +
-          "브라우저 콘솔과 서버 로그를 함께 확인해 주세요.",
-      },
-    ]);
-  }
-};
-
-  /** 공통 버튼 스타일 util */
   const gradientBtnStyle = (active) => ({
     padding: "10px 18px",
     borderRadius: 16,
@@ -1171,7 +1115,6 @@ const handleSendWish = async () => {
     <div className="app-root">
       <Header />
 
-      {/* 후보 선택 모달 */}
       {showCandidateSelector && (
         <div
           style={{
@@ -1187,7 +1130,7 @@ const handleSendWish = async () => {
             zIndex: 1000,
           }}
         >
-                    <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
+          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
             <CandidateSelector
               candidates={candidatePOIs}
               onConfirm={onConfirmSelection}
@@ -1195,8 +1138,6 @@ const handleSendWish = async () => {
               mealOptions={{ breakfast, lunch, dinner, cafe }}
               t={t}
             />
-
-            {/* 🎲 추천된 후보들로 자동 선택 버튼 */}
             <div
               style={{
                 marginTop: 12,
@@ -1224,20 +1165,13 @@ const handleSendWish = async () => {
               </button>
             </div>
           </div>
-          </div>
-        
+        </div>
       )}
 
-      {/* 데스크탑: 850px / 1fr 2열, 모바일: 세로로 쌓이는 레이아웃 */}
       <div className="app-layout">
-        {/* ================= 왼쪽 패널 ================= */}
         <aside className="left-panel">
-          {/* 2열: 왼쪽(출발지 + 옵션들), 오른쪽(필수방문지 + 챗봇) */}
           <div className="left-columns">
-
-            {/* ===== 왼쪽 컬럼 ===== */}
             <div>
-              {/* 출발지·도착지 검색 */}
               <div style={{ marginBottom: 16 }}>
                 <LocationSearch
                   onChange={({ start, end, sameStartEnd }) => {
@@ -1285,8 +1219,6 @@ const handleSendWish = async () => {
                       if (key === "lunch") setLunch((v) => !v);
                       if (key === "dinner") setDinner((v) => !v);
                       if (key === "cafe") setCafe((v) => !v);
-
-                      // 클릭할 때마다 hover도 같이 초기화 → 모바일에서 절대 안 붙잡힘
                       setHoveredMeal(null);
                     };
 
@@ -1302,7 +1234,6 @@ const handleSendWish = async () => {
                         {label}
                       </button>
                     );
-
                   })}
                 </div>
               </section>
@@ -1337,7 +1268,7 @@ const handleSendWish = async () => {
                       } else {
                         setDietPrefs([...dietPrefs, key]);
                       }
-                      setHoveredDiet(null); // 클릭 시 hover 초기화
+                      setHoveredDiet(null);
                     };
 
                     return (
@@ -1352,12 +1283,11 @@ const handleSendWish = async () => {
                         {label}
                       </button>
                     );
-
                   })}
                 </div>
               </section>
 
-              {/* 여행 테마 (최대 3개) */}
+              {/* 여행 테마 */}
               <section style={{ marginBottom: 16 }}>
                 <h3
                   style={{
@@ -1387,22 +1317,15 @@ const handleSendWish = async () => {
                     const toggle = () => {
                       setThemes((prev) => {
                         const already = prev.includes(key);
-
-                        // 이미 선택된 거면 해제
                         if (already) {
                           return prev.filter((t) => t !== key);
                         }
-
-                        // 새로 선택하려고 하는데 이미 3개 선택되어 있으면 막기
                         if (prev.length >= 3) {
                           alert("여행 테마는 최대 3개까지 선택할 수 있어요.");
                           return prev;
                         }
-
-                        // 아직 3개 미만이면 추가
                         return [...prev, key];
                       });
-
                       setHoveredTheme(null);
                     };
 
@@ -1472,7 +1395,6 @@ const handleSendWish = async () => {
                   {t("move.title")}
                 </h3>
 
-                {/* 선호 이동수단 */}
                 <div
                   style={{
                     marginBottom: 12,
@@ -1505,7 +1427,6 @@ const handleSendWish = async () => {
                   })}
                 </div>
 
-                {/* 구간당 이동시간 / 총 방문장소 */}
                 <div
                   style={{
                     display: "flex",
@@ -1641,9 +1562,8 @@ const handleSendWish = async () => {
               </section>
             </div>
 
-            {/* ===== 오른쪽 컬럼 ===== */}
+            {/* 오른쪽 컬럼: 필수 방문지 + 챗봇 */}
             <div>
-              {/* 필수방문지 검색 · 추가 */}
               <div style={{ marginBottom: 32 }}>
                 <RequiredStops
                   value={requiredStops}
@@ -1651,7 +1571,6 @@ const handleSendWish = async () => {
                 />
               </div>
 
-              {/* 여행에 있어서 바라는 점이 있나요? */}
               <section>
                 <h3
                   style={{
@@ -1669,7 +1588,6 @@ const handleSendWish = async () => {
                   <span style={{ fontSize: 20 }}>✶</span>
                   <span>{t("wish.title")}</span>
 
-                  {/* 제목 hover 시 보이는 도움말 툴팁 */}
                   {showWishHelp && (
                     <div
                       style={{
@@ -1696,7 +1614,6 @@ const handleSendWish = async () => {
                         {t("wish.hover")}
                       </div>
 
-                      {/* 챗봇 말풍선 예시 */}
                       <div
                         style={{
                           borderRadius: 999,
@@ -1711,7 +1628,6 @@ const handleSendWish = async () => {
                         {t("wish.hover1")} 👇
                       </div>
 
-                      {/* 사용자 말풍선 예시 */}
                       <div
                         style={{
                           borderRadius: 999,
@@ -1768,7 +1684,6 @@ const handleSendWish = async () => {
                   )}
                 </h3>
 
-                {/* ===================== 실제 대화 말풍선 영역 ===================== */}
                 <div
                   style={{
                     height: 500,
@@ -1827,7 +1742,6 @@ const handleSendWish = async () => {
                   ))}
                 </div>
 
-                {/* ===================== 실제 입력창 + SEND ===================== */}
                 <div
                   style={{
                     borderRadius: 18,
@@ -1839,40 +1753,37 @@ const handleSendWish = async () => {
                   }}
                 >
                   <textarea
-                  value={wishText}
-                  onChange={(e) => setWishText(e.target.value)}
-                  onKeyDown={(e) => {
-                    // Enter만 치면 전송, Shift+Enter는 줄바꿈
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendWish();
-                    }
-                  }}
-                  onInput={(e) => {
-                    e.target.style.height = "auto";
-                    e.target.style.height = e.target.scrollHeight + "px";
-                  }}
-                  rows={1}
-                  style={{
-                    border: "none",
-                    padding: "10px 14px",
-                    fontSize: 13,
-                    outline: "none",
-                    width: "100%",
-                    resize: "none",
-                    overflowY: "hidden",
-                    boxSizing: "border-box",
-                  }}
-                />
-
-
+                    value={wishText}
+                    onChange={(e) => setWishText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendWish();
+                      }
+                    }}
+                    onInput={(e) => {
+                      e.target.style.height = "auto";
+                      e.target.style.height = e.target.scrollHeight + "px";
+                    }}
+                    rows={1}
+                    style={{
+                      border: "none",
+                      padding: "10px 14px",
+                      fontSize: 13,
+                      outline: "none",
+                      width: "100%",
+                      resize: "none",
+                      overflowY: "hidden",
+                      boxSizing: "border-box",
+                    }}
+                  />
 
                   <button
                     type="button"
                     onClick={handleSendWish}
                     onMouseEnter={() => setIsSendHover(true)}
                     onMouseLeave={() => setIsSendHover(false)}
-                    onMouseDown={(e) => e.preventDefault()} // ← 클릭 시 테두리 제거
+                    onMouseDown={(e) => e.preventDefault()}
                     style={{
                       border: "none",
                       background: isSendHover ? "#e5e7eb" : "#f3f4f6",
@@ -1881,7 +1792,7 @@ const handleSendWish = async () => {
                       cursor: "pointer",
                       transition: "background 0.15s ease",
                       outline: "none",
-                      boxShadow: "none", // 기본 focus-shadow 제거
+                      boxShadow: "none",
                     }}
                   >
                     {t("button.send")}
@@ -1890,29 +1801,25 @@ const handleSendWish = async () => {
               </section>
             </div>
           </div>
-          {/* 채팅칸 끝나는 부분 바로 아래에 삽입 */}
 
-       {/* 챗봇 박스 아래, 버튼 위 */}
-      <div className="atlas-loading-wrapper">
-        {statusKey === "status.generating" && (
-          <div className="atlas-loading">
-            <div className="atlas-logo-spinner">
-              <AtlasLogo size={28} />
-            </div>
+          {/* ATLAS 엔진 로딩 UI (챗봇 박스 아래, 버튼 위) */}
+          <div className="atlas-loading-wrapper">
+            {statusKey === "status.generating" && (
+              <div className="atlas-loading">
+                <div className="atlas-logo-spinner">
+                  <AtlasLogo size={28} />
+                </div>
 
-            <div className="atlas-loading-text">
-              <div className="atlas-powered">
-                Powered by <strong>ATLAS Engine</strong>
+                <div className="atlas-loading-text">
+                  <div className="atlas-powered">
+                    Powered by <strong>ATLAS Engine</strong>
+                  </div>
+                  <div className="atlas-status">{t(statusKey)}</div>
+                </div>
               </div>
-              <div className="atlas-status">{t(statusKey)}</div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
 
-
-
-          {/* 하단: 여행계획 생성 버튼 */}
           <button
             onClick={onSearchCandidates}
             style={{
@@ -1932,17 +1839,13 @@ const handleSendWish = async () => {
           >
             {t("button.generate")}
           </button>
-
         </aside>
 
-        {/* ================= 오른쪽: 지도 + 아래에 일정/장소 ================= */}
         <main className="right-main">
-          {/* 1) 지도 카드 */}
           <section className="map-card">
             <div ref={mapDivRef} className="map-container" />
           </section>
 
-          {/* 2) 시간별 일정 카드 */}
           <section className="schedule-card">
             <h3 style={{ marginTop: 0, marginBottom: 12 }}>
               {t("schedule.title")}
@@ -1975,121 +1878,147 @@ const handleSendWish = async () => {
                   </tr>
                 </thead>
                 <tbody>
-                {plan.schedule.map((r) => {
-    const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
+                  {plan.schedule.map((r) => {
+                    const flags = getPlaceLangFlags(
+                      r.nameKo || r.name,
+                      getActiveLangCodes()
+                    );
 
-    return (
-      <tr key={r.order}>
-        <td style={{ padding: "4px 0" }}>{r.order}</td>
-        <td style={{ padding: "4px 0" }}>
-          {currentLang === "ko"
-            ? (r.nameKo || r.name) // 한국어 UI면 그냥 한글만
-            : r.nameTranslated && r.nameTranslated !== (r.nameKo || r.name)
-            ? `${r.nameTranslated} (${r.nameKo || r.name})` // 예: Gyeongbokgung Palace (경복궁)
-            : (r.nameKo || r.name)}
+                    return (
+                      <tr key={r.order}>
+                        <td style={{ padding: "4px 0" }}>{r.order}</td>
+                        <td style={{ padding: "4px 0" }}>
+                          {currentLang === "ko"
+                            ? r.nameKo || r.name
+                            : r.nameTranslated &&
+                              r.nameTranslated !== (r.nameKo || r.name)
+                            ? `${r.nameTranslated} (${r.nameKo || r.name})`
+                            : r.nameKo || r.name}
+                          {flags.length > 0 && (
+                            <span style={{ marginLeft: 6 }}>
+                              {flags.map((info) => (
+                                <ReactCountryFlag
+                                  key={info.code}
+                                  countryCode={info.countryCode}
+                                  svg
+                                  title={info.label}
+                                  style={{
+                                    width: "1em",
+                                    height: "1em",
+                                    marginRight: 4,
+                                    verticalAlign: "middle",
+                                  }}
+                                />
+                              ))}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "4px 0" }}>
+                          {formatCategory(r)}
+                        </td>
+                        <td style={{ padding: "4px 0" }}>
+                          {(() => {
+                            const raw = r.category || "";
+                            const ko = r.categoryKo || raw;
+                            const tr = r.categoryTranslated || "";
 
-          {flags.length > 0 && (
-            <span style={{ marginLeft: 6 }}>
-              {flags.map((info) => (
-                <ReactCountryFlag
-                  key={info.code}
-                  countryCode={info.countryCode}    // "KR", "US" ...
-                  svg
-                  title={info.label}
-                  style={{
-                    width: "1em",
-                    height: "1em",
-                    marginRight: 4,
-                    verticalAlign: "middle",
-                  }}
-                />
-              ))}
-            </span>
-          )}
-        </td>
-        <td style={{ padding: "4px 0" }}>{formatCategory(r)}</td>
-        {/* 🔹 카테고리: 번역 + / + 한국어 */}
-        <td style={{ padding: "4px 0" }}>
-          {(() => {
-            const raw = r.category || "";                // 원본 카테고리 (예: "출발", "도착", "required", 그 외…)
-            const ko = r.categoryKo || raw;             // 한국어 카테고리
-            const tr = r.categoryTranslated || "";      // 번역된 카테고리 (Gemini에서 온 값)
+                            const translateSpecialCategory = () => {
+                              if (raw === "출발") {
+                                switch (currentLang) {
+                                  case "ko":
+                                    return "출발";
+                                  case "en":
+                                    return "Start";
+                                  case "ja":
+                                    return "出発";
+                                  case "zh-CN":
+                                    return "出发";
+                                  case "zh-TW":
+                                    return "出發";
+                                  case "vi":
+                                    return "Khởi hành";
+                                  case "th":
+                                    return "ออกเดินทาง";
+                                  case "id":
+                                    return "Mulai";
+                                  case "es":
+                                    return "Salida";
+                                  case "de":
+                                    return "Start";
+                                  default:
+                                    return ko;
+                                }
+                              }
+                              if (raw === "도착") {
+                                switch (currentLang) {
+                                  case "ko":
+                                    return "도착";
+                                  case "en":
+                                    return "End";
+                                  case "ja":
+                                    return "到着";
+                                  case "zh-CN":
+                                    return "到达";
+                                  case "zh-TW":
+                                    return "抵達";
+                                  case "vi":
+                                    return "Kết thúc";
+                                  case "th":
+                                    return "สิ้นสุด";
+                                  case "id":
+                                    return "Selesai";
+                                  case "es":
+                                    return "Llegada";
+                                  case "de":
+                                    return "Ziel";
+                                  default:
+                                    return ko;
+                                }
+                              }
+                              if (raw === "required") {
+                                switch (currentLang) {
+                                  case "ko":
+                                    return "필수 방문지";
+                                  case "en":
+                                    return "Required stop";
+                                  case "ja":
+                                    return "必須スポット";
+                                  case "zh-CN":
+                                    return "必去景点";
+                                  case "zh-TW":
+                                    return "必去景點";
+                                  case "vi":
+                                    return "Điểm bắt buộc";
+                                  case "th":
+                                    return "จุดที่ต้องไป";
+                                  case "id":
+                                    return "Tempat wajib";
+                                  case "es":
+                                    return "Parada obligatoria";
+                                  case "de":
+                                    return "Pflichtstopp";
+                                  default:
+                                    return ko;
+                                }
+                              }
+                              return null;
+                            };
 
-            // 🔹 1) 출발 / 도착 / 필수 방문지 → 언어별 고정 번역
-            const translateSpecialCategory = () => {
-              // 출발
-              if (raw === "출발") {
-                switch (currentLang) {
-                  case "ko":   return "출발";
-                    case "en":   return "Start";
-                    case "ja":   return "出発";
-                    case "zh-CN":return "出发";
-                    case "zh-TW":return "出發";
-                    case "vi":   return "Khởi hành";
-                    case "th":   return "ออกเดินทาง";
-                    case "id":   return "Mulai";
-                    case "es":   return "Salida";
-                    case "de":   return "Start";
-                    default:     return ko;
-                  }
-                }
+                            const special = translateSpecialCategory();
+                            if (special) return special;
 
-                // 도착
-                if (raw === "도착") {
-                  switch (currentLang) {
-                    case "ko":   return "도착";
-                    case "en":   return "End";
-                    case "ja":   return "到着";
-                    case "zh-CN":return "到达";
-                    case "zh-TW":return "抵達";
-                    case "vi":   return "Kết thúc";
-                    case "th":   return "สิ้นสุด";
-                    case "id":   return "Selesai";
-                    case "es":   return "Llegada";
-                    case "de":   return "Ziel";
-                    default:     return ko;
-                  }
-                }
-
-                // 필수 방문지 (required)
-                if (raw === "required") {
-                  switch (currentLang) {
-                    case "ko":   return "필수 방문지";
-                    case "en":   return "Required stop";
-                    case "ja":   return "必須スポット";
-                    case "zh-CN":return "必去景点";
-                    case "zh-TW":return "必去景點";
-                    case "vi":   return "Điểm bắt buộc";
-                    case "th":   return "จุดที่ต้องไป";
-                    case "id":   return "Tempat wajib";
-                    case "es":   return "Parada obligatoria";
-                    case "de":   return "Pflichtstopp";
-                    default:     return ko;
-                  }
-                }
-
-                return null; // 특별 카테고리 아님
-              };
-
-              const special = translateSpecialCategory();
-              if (special) return special;   // 출발/도착/필수면 여기서 끝
-
-              // 🔹 2) 그 외 일반 카테고리 (맛집/카페/쇼핑…) 처리
-              if (currentLang === "ko") return ko;
-              if (!tr || tr === ko) return ko;
-
-              // 예: "Buffet > Vegetarian / 뷔페>채식뷔페"
-              return `${tr}`;
-            })()}
-        </td>
-        <td style={{ padding: "4px 0" }}>{r.arrival}</td>
-        <td style={{ padding: "4px 0" }}>{r.depart}</td>
-      </tr>
-    );
-  })}
-</tbody>
-
-</table>
+                            if (currentLang === "ko") return ko;
+                            if (!tr || tr === ko) return ko;
+                            return `${tr}`;
+                          })()}
+                        </td>
+                        <td style={{ padding: "4px 0" }}>{r.arrival}</td>
+                        <td style={{ padding: "4px 0" }}>{r.depart}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {t("schedule.none")}
@@ -2097,110 +2026,137 @@ const handleSendWish = async () => {
             )}
           </section>
 
-          {/* 3) 장소 세부정보 카드 */}
           <section className="details-card">
             <h3 style={{ marginTop: 0, marginBottom: 12 }}>
               {t("specifics.title")}
             </h3>
             {plan?.schedule?.length ? (
               <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
-              {plan.schedule.map((r) => {
-                const flags = getPlaceLangFlags(r.nameKo || r.name, getActiveLangCodes());
-            
-                return (
-                  <li key={r.order} style={{ marginBottom: 6 }}>
-                    <b>
-                      {r.order}. {formatPlaceName(r)}
-                      {flags.length > 0 && (
-                        <span style={{ marginLeft: 6 }}>
+                {plan.schedule.map((r) => {
+                  const flags = getPlaceLangFlags(
+                    r.nameKo || r.name,
+                    getActiveLangCodes()
+                  );
 
-                         {flags.map((info) => (
-                            <ReactCountryFlag
-                            key={info.code}
-                            countryCode={info.countryCode}
-                            svg
-                            title={info.label}
-                            style={{
-                              width: "1em",
-                              height: "1em",
-                              marginRight: 4,
-                              verticalAlign: "middle",
-                            }}
-                          />
-                        ))}
-                      </span>
+                  return (
+                    <li key={r.order} style={{ marginBottom: 6 }}>
+                      <b>
+                        {r.order}. {formatPlaceName(r)}
+                        {flags.length > 0 && (
+                          <span style={{ marginLeft: 6 }}>
+                            {flags.map((info) => (
+                              <ReactCountryFlag
+                                key={info.code}
+                                countryCode={info.countryCode}
+                                svg
+                                title={info.label}
+                                style={{
+                                  width: "1em",
+                                  height: "1em",
+                                  marginRight: 4,
+                                  verticalAlign: "middle",
+                                }}
+                              />
+                            ))}
+                          </span>
+                        )}
+                      </b>{" "}
+                      —{" "}
+                      {(() => {
+                        const raw = r.category || "";
+                        const ko = r.categoryKo || raw;
+                        const tr = r.categoryTranslated || "";
 
-                      )}
-                    </b>{" "}
-                     —{" "}
-                     {/* 🔹 카테고리: 출발/도착/필수는 언어별 번역 + 나머지는 번역/한국어 병기 */}
-                    {(() => {
-                      const raw = r.category || "";           // 원본 카테고리 (출발/도착/required/기타)
-                      const ko = r.categoryKo || raw;        // 한국어 카테고리
-                      const tr = r.categoryTranslated || ""; // 번역된 카테고리 (Gemini 결과)
-
-                      // 1) 출발 / 도착 / 필수 방문지 → 언어별 고정 번역
-                      if (raw === "출발") {
-                        switch (currentLang) {
-                          case "ko":   return "출발";
-                          case "en":   return "Start";
-                          case "ja":   return "出発";
-                          case "zh-CN":return "出发";
-                          case "zh-TW":return "出發";
-                          case "vi":   return "Khởi hành";
-                          case "th":   return "ออกเดินทาง";
-                          case "id":   return "Mulai";
-                          case "es":   return "Salida";
-                          case "de":   return "Start";
-                          default:     return ko;
+                        if (raw === "출발") {
+                          switch (currentLang) {
+                            case "ko":
+                              return "출발";
+                            case "en":
+                              return "Start";
+                            case "ja":
+                              return "出発";
+                            case "zh-CN":
+                              return "出发";
+                            case "zh-TW":
+                              return "出發";
+                            case "vi":
+                              return "Khởi hành";
+                            case "th":
+                              return "ออกเดินทาง";
+                            case "id":
+                              return "Mulai";
+                            case "es":
+                              return "Salida";
+                            case "de":
+                              return "Start";
+                            default:
+                              return ko;
+                          }
                         }
-                      }
 
-                      if (raw === "도착") {
-                        switch (currentLang) {
-                          case "ko":   return "도착";
-                          case "en":   return "End";
-                          case "ja":   return "到着";
-                          case "zh-CN":return "到达";
-                          case "zh-TW":return "抵達";
-                          case "vi":   return "Kết thúc";
-                          case "th":   return "สิ้นสุด";
-                          case "id":   return "Selesai";
-                          case "es":   return "Llegada";
-                          case "de":   return "Ziel";
-                          default:     return ko;
+                        if (raw === "도착") {
+                          switch (currentLang) {
+                            case "ko":
+                              return "도착";
+                            case "en":
+                              return "End";
+                            case "ja":
+                              return "到着";
+                            case "zh-CN":
+                              return "到达";
+                            case "zh-TW":
+                              return "抵達";
+                            case "vi":
+                              return "Kết thúc";
+                            case "th":
+                              return "สิ้นสุด";
+                            case "id":
+                              return "Selesai";
+                            case "es":
+                              return "Llegada";
+                            case "de":
+                              return "Ziel";
+                            default:
+                              return ko;
+                          }
                         }
-                      }
 
-                      if (raw === "required") {
-                        switch (currentLang) {
-                          case "ko":   return "필수 방문지";
-                          case "en":   return "Required stop";
-                          case "ja":   return "必須スポット";
-                          case "zh-CN":return "必去景点";
-                          case "zh-TW":return "必去景點";
-                          case "vi":   return "Điểm bắt buộc";
-                          case "th":   return "จุดที่ต้องไป";
-                          case "id":   return "Tempat wajib";
-                          case "es":   return "Parada obligatoria";
-                          case "de":   return "Pflichtstopp";
-                          default:     return ko;
+                        if (raw === "required") {
+                          switch (currentLang) {
+                            case "ko":
+                              return "필수 방문지";
+                            case "en":
+                              return "Required stop";
+                            case "ja":
+                              return "必須スポット";
+                            case "zh-CN":
+                              return "必去景点";
+                            case "zh-TW":
+                              return "必去景點";
+                            case "vi":
+                              return "Điểm bắt buộc";
+                            case "th":
+                              return "จุดที่ต้องไป";
+                            case "id":
+                              return "Tempat wajib";
+                            case "es":
+                              return "Parada obligatoria";
+                            case "de":
+                              return "Pflichtstopp";
+                            default:
+                              return ko;
+                          }
                         }
-                      }
 
-                      // 2) 일반 카테고리 (맛집/카페/쇼핑 등)
-                      if (currentLang === "ko") return ko;
-                      if (!tr || tr === ko) return ko;
-
-                      return `${tr}`; // 예: "Buffet / 뷔페"
-                    })()}
-                    {" "}
-                    / {r.arrival} ~ {r.depart}
-                  </li>
-                );
-              })}
-            </ul>
-            
+                        if (currentLang === "ko") return ko;
+                        if (!tr || tr === ko) return ko;
+                        return `${tr}`;
+                      })()}{" "}
+                      / {r.arrival} ~ {r.depart}
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
                 {t("specifics.none")}
@@ -2211,8 +2167,4 @@ const handleSendWish = async () => {
       </div>
     </div>
   );
-
 }
-
-
-
