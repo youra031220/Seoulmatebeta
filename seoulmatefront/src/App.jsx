@@ -1120,70 +1120,57 @@ export default function App() {
       <Header />
 
       {showCandidateSelector && (
-  <div
-    style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: "rgba(0,0,0,0.5)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-    }}
-  >
-    <div
-      style={{
-        maxWidth: 600,
-        width: "90%",
-        maxHeight: "90vh",
-        display: "flex",
-        flexDirection: "column", // 🔹 위: 모달, 아래: 버튼
-      }}
-    >
-      {/* 위쪽: CandidateSelector가 차지할 영역 (스크롤 포함) */}
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <CandidateSelector
-          candidates={candidatePOIs}
-          onConfirm={onConfirmSelection}
-          onCancel={onCancelSelection}
-          mealOptions={{ breakfast, lunch, dinner, cafe }}
-          t={t}
-        />
-      </div>
-
-      {/* 아래쪽: "알아서 해주세요" 버튼 */}
-      <div
-        style={{
-          marginTop: 12,
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
-        <button
-          type="button"
-          onClick={autoSelectFromCandidates}
+        <div
           style={{
-            padding: "10px 16px",
-            borderRadius: 999,
-            border: "none",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            background:
-              "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
-            color: "#ffffff",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
           }}
         >
-          {t("button.auto_select")}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
+            <CandidateSelector
+              candidates={candidatePOIs}
+              onConfirm={onConfirmSelection}
+              onCancel={onCancelSelection}
+              mealOptions={{ breakfast, lunch, dinner, cafe }}
+              t={t}
+            />
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                justifyContent: "flex-end",
+              }}
+            >
+              <button
+                type="button"
+                onClick={autoSelectFromCandidates}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 999,
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background:
+                    "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
+                  color: "#ffffff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                }}
+              >
+                {t("button.auto_select")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       <div className="app-layout">
