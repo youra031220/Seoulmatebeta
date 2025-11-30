@@ -23,6 +23,8 @@ export default function LocationSearch({ onChange }) {
   const boxRef = useRef(null);
   const debounceRef = useRef(null);
   const lastPayloadRef = useRef(null);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 
   // 부모에게 위치 변경 전달
   useEffect(() => {
@@ -79,19 +81,25 @@ export default function LocationSearch({ onChange }) {
     }
 
     debounceRef.current = setTimeout(async () => {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
-        const data = await res.json();
-        const items = data.items || [];
+  try {
+    setLoading(true);
 
-        setResults(items);
-      } catch (e) {
-        console.error("search error", e);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    const url = API_BASE_URL
+      ? `${API_BASE_URL}/api/search?q=${encodeURIComponent(keyword)}`
+      : `/api/search?q=${encodeURIComponent(keyword)}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    const items = data.items || [];
+
+    setResults(items);
+  } catch (e) {
+    console.error("search error", e);
+  } finally {
+    setLoading(false);
+  }
+}, 300);
+
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
