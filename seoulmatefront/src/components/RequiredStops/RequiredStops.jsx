@@ -12,6 +12,10 @@ export default function RequiredStops({ value = [], onChange }) {
 
   const debounceRef = useRef(null);
   const boxRef = useRef(null);
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const api = (path) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
+
+
 
   // 바깥 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -36,9 +40,11 @@ export default function RequiredStops({ value = [], onChange }) {
     debounceRef.current = setTimeout(async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const url = api(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(url);
         const data = await res.json();
         setResults(data.items || []);
+
       } catch (err) {
         console.error(err);
       } finally {
@@ -66,9 +72,9 @@ export default function RequiredStops({ value = [], onChange }) {
     // ② 혹시 mapx/mapy가 없을 때만 geocode로 보완 (옵션)
     if ((lat === null || lon === null) && addr) {
       try {
-        const g = await fetch(
-          `/api/geocode?addr=${encodeURIComponent(addr)}`
-        ).then((r) => r.json());
+        const geoUrl = api(`/api/geocode?addr=${encodeURIComponent(addr)}`);
+        const g = await fetch(geoUrl).then((r) => r.json());
+
         if (g?.addresses?.[0]) {
           lon = parseFloat(g.addresses[0].x);
           lat = parseFloat(g.addresses[0].y);
