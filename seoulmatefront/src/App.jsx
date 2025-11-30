@@ -139,6 +139,10 @@ export default function App() {
   const [showCandidateSelector, setShowCandidateSelector] = useState(false);
   const [selectedPOIs, setSelectedPOIs] = useState([]);
 
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+  const api = (path) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
+
   /** 지도 초기화 */
   useEffect(() => {
     if (!mapDivRef.current) return;
@@ -521,7 +525,7 @@ export default function App() {
     });
 
     try {
-      const res = await fetch("/api/search-with-pref", {
+      const res = await fetch(api("/api/search-with-pref"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -716,7 +720,7 @@ export default function App() {
 
     setRefineLoading(true);
     try {
-      const res = await fetch("/api/route/refine", {
+      const res = await fetch(api("/api/route/refine"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1013,7 +1017,7 @@ export default function App() {
     setWishText("");
 
     try {
-      const res = await fetch("/api/travel-wish", {
+      const res = await fetch(api("/api/travel-wish"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1116,57 +1120,71 @@ export default function App() {
       <Header />
 
       {showCandidateSelector && (
-        <div
+  <div
+    style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+    }}
+  >
+    <div
+      style={{
+        maxWidth: 600,
+        width: "90%",
+        maxHeight: "90vh",
+        display: "flex",
+        flexDirection: "column", // 🔹 위: 모달, 아래: 버튼
+      }}
+    >
+      {/* 위쪽: CandidateSelector가 차지할 영역 (스크롤 포함) */}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <CandidateSelector
+          candidates={candidatePOIs}
+          onConfirm={onConfirmSelection}
+          onCancel={onCancelSelection}
+          mealOptions={{ breakfast, lunch, dinner, cafe }}
+          t={t}
+        />
+      </div>
+
+      {/* 아래쪽: "알아서 해주세요" 버튼 */}
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <button
+          type="button"
+          onClick={autoSelectFromCandidates}
           style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: "none",
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            background:
+              "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
+            color: "#ffffff",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
           }}
         >
-          <div style={{ maxWidth: 600, width: "90%", maxHeight: "90vh" }}>
-            <CandidateSelector
-              candidates={candidatePOIs}
-              onConfirm={onConfirmSelection}
-              onCancel={onCancelSelection}
-              mealOptions={{ breakfast, lunch, dinner, cafe }}
-              t={t}
-            />
-            <div
-              style={{
-                marginTop: 12,
-                display: "flex",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button
-                type="button"
-                onClick={autoSelectFromCandidates}
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 999,
-                  border: "none",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background:
-                    "linear-gradient(90deg,#6366f1 0%,#ec4899 50%,#f97316 100%)",
-                  color: "#ffffff",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
-                }}
-              >
-                {t("button.auto_select")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          {t("button.auto_select")}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
       <div className="app-layout">
         <aside className="left-panel">

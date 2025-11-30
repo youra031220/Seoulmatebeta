@@ -277,19 +277,20 @@ export default function CandidateSelector({
     (selectedCafe ? 1 : 0);
 
   return (
-    <div
-      style={{
-        backgroundColor: "#ffffff",
-        borderRadius: 24,
-        padding: 20,
-        boxShadow: "0 20px 50px rgba(15,23,42,0.4)",
-        maxHeight: "90vh",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        gap: 16,
-      }}
-    >
+  <div
+    style={{
+      backgroundColor: "#ffffff",
+      borderRadius: 24,
+      padding: 20,
+      boxShadow: "0 20px 50px rgba(15,23,42,0.4)",
+      maxHeight: "100%",      // 🔹 부모가 허용하는 높이 안에서만
+      overflow: "hidden",     // 내용 스크롤은 안쪽 div가 담당
+      display: "flex",
+      flexDirection: "column",
+      gap: 16,
+    }}
+  >
+
       {/* 헤더 */}
       <header>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
