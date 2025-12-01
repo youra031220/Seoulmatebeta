@@ -1919,9 +1919,6 @@ export default function App() {
                           )}
                         </td>
                         <td style={{ padding: "4px 0" }}>
-                          {formatCategory(r)}
-                        </td>
-                        <td style={{ padding: "4px 0" }}>
                           {(() => {
                             const raw = r.category || "";
                             const ko = r.categoryKo || raw;
