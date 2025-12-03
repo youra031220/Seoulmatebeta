@@ -1,4 +1,5 @@
 .aider*
 .env
+*.env
 .bak
 node_modules/
